@@ -1,0 +1,1 @@
+Before installing from `requirements.txt`, install the latest `cx_Freeze` like this: `$PYTHON -m pip install --upgrade git+https://github.com/anthony-tuininga/cx_Freeze.git@master`.
