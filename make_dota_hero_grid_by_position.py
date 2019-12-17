@@ -25,8 +25,19 @@ CATEGORY_ROW_HEIGHT = 90
 CATEGORY_HEROES_PER_ROW = 22
 CATEGORY_BOTTOM_PADDING = 60
 
+
 POSITIONS = ['One', 'Two', 'Three', 'Four', 'Five']
-RANKS = {
+CORE_LANE_POSITIONS = {
+    1: 1,
+    2: 2,
+    3: 3
+}
+SUPPORT_LANE_POSITIONS = {
+    1: 5,
+    3: 4
+}
+
+RANK_IDS = {
     'Herald': 1,
     'Guardian': 2,
     'Crusader': 3,
@@ -92,16 +103,23 @@ def main():
             'configs': []
         }
 
-    try:
-        heroes = requests.get('https://api.opendota.com/api/heroStats').json()
-    except requests.RequestException:
-        raise Error(r'Failed to retreive data from OpenDota')
+    winrates = {i: {} for i in range(1, 6)}
+    heroes_core_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=0&rank={}'.format(RANK_IDS[config['core_rank']])).json()
+    heroes_support_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=1&rank={}'.format(RANK_IDS[config['support_rank']])).json()
 
-    core_rank = RANKS[config['core_rank']]
-    core_rank_heroes = sorted(heroes, key=lambda h: h['{}_win'.format(core_rank)] / h['{}_pick'.format(core_rank)], reverse=True)
+    for hero in heroes_core_info['heroes']:
+        for lane in hero['heroLaneDetail']:
+            try:
+                winrates[CORE_LANE_POSITIONS[lane['laneId']]][hero['heroId']] = lane['wins']
+            except KeyError:
+                continue
 
-    support_rank = RANKS[config['support_rank']]
-    support_rank_heroes = sorted(heroes, key=lambda h: h['{}_win'.format(support_rank)] / h['{}_pick'.format(support_rank)], reverse=True)
+    for hero in heroes_support_info['heroes']:
+        for lane in hero['heroLaneDetail']:
+            try:
+                winrates[SUPPORT_LANE_POSITIONS[lane['laneId']]][hero['heroId']] = lane['wins']
+            except KeyError:
+                continue
 
     def make_grid_category(i):
         return {
@@ -118,15 +136,17 @@ def main():
         'categories': [make_grid_category(i) for i in range(5)]
     }
 
-    for hero in core_rank_heroes:
-        for position in config['hero_positions'][hero['localized_name']]:
-            if position in [1, 2, 3]:
-                new_grid['categories'][position - 1]['hero_ids'].append(hero['id'])
+    hero_ids = {}
+    hero_basic_info = requests.get('https://api.stratz.com/api/v1/Hero').json()
+    for _, hero in hero_basic_info.items():
+        hero_ids[hero['displayName']] = hero['id']
 
-    for hero in support_rank_heroes:
-        for position in config['hero_positions'][hero['localized_name']]:
-            if position in [4, 5]:
-                new_grid['categories'][position - 1]['hero_ids'].append(hero['id'])
+    for name, positions in config['hero_positions'].items():
+        for position in positions:
+            new_grid['categories'][position - 1]['hero_ids'].append(hero_ids[name])
+
+    for i, _ in enumerate(new_grid['categories']):
+        new_grid['categories'][i]['hero_ids'].sort(key=lambda id_: winrates[i + 1][id_], reverse=True)
 
     previous_heights = 0
     for category in new_grid['categories']:
@@ -153,6 +173,8 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except requests.RequestException:
+        raise Error(r'Failed to retreive data from Stratz')
     except Error as e:
         print('Error: {}'.format(e.args[0]))
         exit(1)
