@@ -3,17 +3,20 @@ import math
 import os
 from pathlib import Path
 import requests
-import winreg
+import sys
 
+if sys.platform == 'win32':
+    import winreg
 
 DOTA2_APP_ID = 570
 
-STEAM_REGISTRY_ROOT_KEY = winreg.HKEY_CURRENT_USER
-STEAM_REGISTRY_KEY = r'Software\Valve\Steam'
-STEAM_REGISTRY_PATH_VALUE = 'SteamPath'
-STEAM_REGISTRY_APPS_KEY = 'Apps'
-STEAM_REGISTRY_APP_INSTALLED_VALUE = 'Installed'
-STEAM_REGISTRY_USERS_KEY = 'Users'
+if sys.platform == 'win32':
+    STEAM_REGISTRY_ROOT_KEY = winreg.HKEY_CURRENT_USER
+    STEAM_REGISTRY_KEY = r'Software\Valve\Steam'
+    STEAM_REGISTRY_PATH_VALUE = 'SteamPath'
+    STEAM_REGISTRY_APPS_KEY = 'Apps'
+    STEAM_REGISTRY_APP_INSTALLED_VALUE = 'Installed'
+    STEAM_REGISTRY_USERS_KEY = 'Users'
 
 STEAM_USERDATA_FOLDER = 'userdata'
 STEAM_USERDATA_REMOTE_FOLDER = 'remote'
@@ -60,38 +63,41 @@ def main():
     with open('config.json', 'r') as fp:
         config = json.load(fp)
 
-    try:
-        steam_registry_key = winreg.OpenKey(STEAM_REGISTRY_ROOT_KEY, STEAM_REGISTRY_KEY)
-    except OSError:
-        raise Error(r'Steam registry keys missing.')
-
-    try:
-        steam_registry_dota_key = winreg.OpenKey(steam_registry_key, r'{}\{}'.format(STEAM_REGISTRY_APPS_KEY, DOTA2_APP_ID))
-        if winreg.QueryValueEx(steam_registry_dota_key, STEAM_REGISTRY_APP_INSTALLED_VALUE)[0] == '0':
-            raise OSError
-    except OSError:
-        warning(r'Steam registry indicates Dota 2 is not installed.')
-
-    trade_id = None
-    if config['trade_id'] == 0:
+    if sys.platform == 'win32':
         try:
-            steam_registry_users_key = winreg.OpenKey(steam_registry_key, STEAM_REGISTRY_USERS_KEY)
+            steam_registry_key = winreg.OpenKey(STEAM_REGISTRY_ROOT_KEY, STEAM_REGISTRY_KEY)
         except OSError:
-            raise Error(r'Steam registry user data missing.')
-            
+            raise Error(r'Steam registry keys missing.')
+
         try:
-            for i in range(2):
-                trade_id = winreg.EnumKey(steam_registry_users_key, i)
-                if i == 1:
-                    raise Error(r'Multiple Steam users detected. Please supply your trade ID in `config.json` under "trade_id".')
+            steam_registry_dota_key = winreg.OpenKey(steam_registry_key, r'{}\{}'.format(STEAM_REGISTRY_APPS_KEY, DOTA2_APP_ID))
+            if winreg.QueryValueEx(steam_registry_dota_key, STEAM_REGISTRY_APP_INSTALLED_VALUE)[0] == '0':
+                raise OSError
         except OSError:
-            if not trade_id:
-                raise Error(r'No Steam users detected. Try supplying your trade ID in `config.json` under "trade_id".')
+            warning(r'Steam registry indicates Dota 2 is not installed.')
+
+        trade_id = None
+        if config['trade_id'] == 0:
+            try:
+                steam_registry_users_key = winreg.OpenKey(steam_registry_key, STEAM_REGISTRY_USERS_KEY)
+            except OSError:
+                raise Error(r'Steam registry user data missing.')
+                
+            try:
+                for i in range(2):
+                    trade_id = winreg.EnumKey(steam_registry_users_key, i)
+                    if i == 1:
+                        raise Error(r'Multiple Steam users detected. Please supply your trade ID in `config.json` under "trade_id".')
+            except OSError:
+                if not trade_id:
+                    raise Error(r'No Steam users detected. Try supplying your trade ID in `config.json` under "trade_id".')
+        else:
+            trade_id = config['trade_id']
+
+        steam_path = Path(winreg.QueryValueEx(steam_registry_key, STEAM_REGISTRY_PATH_VALUE)[0])
+        grid_config_path = steam_path / STEAM_USERDATA_FOLDER / trade_id / str(DOTA2_APP_ID) / STEAM_USERDATA_REMOTE_FOLDER / DOTA2_CFG_FOLDER / GRID_CONFIG_FILE_NAME
     else:
-        trade_id = config['trade_id']
-
-    steam_path = Path(winreg.QueryValueEx(steam_registry_key, STEAM_REGISTRY_PATH_VALUE)[0])
-    grid_config_path = steam_path / STEAM_USERDATA_FOLDER / trade_id / str(DOTA2_APP_ID) / STEAM_USERDATA_REMOTE_FOLDER / DOTA2_CFG_FOLDER / GRID_CONFIG_FILE_NAME
+        grid_config_path = sys.argv[1]
 
     try:
         with open(grid_config_path, 'r') as fp:

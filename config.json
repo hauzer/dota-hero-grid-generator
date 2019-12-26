@@ -1,8 +1,11 @@
 {
+    "grid_name": "Positions by Winrate",
+
     "core_rank": "Ancient",
     "support_rank": "Divine",
-    "grid_name": "Positions by Winrate",
+
     "total_pickrate_treshold": 0.005,
     "lane_pickrate_treshold": 0.05,
+
     "trade_id": 0
 }
