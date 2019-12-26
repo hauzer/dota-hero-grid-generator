@@ -97,7 +97,10 @@ def main():
         steam_path = Path(winreg.QueryValueEx(steam_registry_key, STEAM_REGISTRY_PATH_VALUE)[0])
         grid_config_path = steam_path / STEAM_USERDATA_FOLDER / trade_id / str(DOTA2_APP_ID) / STEAM_USERDATA_REMOTE_FOLDER / DOTA2_CFG_FOLDER / GRID_CONFIG_FILE_NAME
     else:
-        grid_config_path = sys.argv[1]
+        if len(sys.argv) == 2:
+            grid_config_path = Path(sys.argv[1]) / GRID_CONFIG_FILE_NAME
+        else:
+            raise Error(r'Argument missing: output directory.')
 
     try:
         with open(grid_config_path, 'r') as fp:
