@@ -103,23 +103,19 @@ def main():
             'configs': []
         }
 
-    winrates = {i: {} for i in range(1, 6)}
+    heroes_info_all = {i: {} for i in range(1, 6)}
     heroes_core_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=0&rank={}'.format(RANK_IDS[config['core_rank']])).json()
     heroes_support_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=1&rank={}'.format(RANK_IDS[config['support_rank']])).json()
 
-    for hero in heroes_core_info['heroes']:
-        for lane in hero['heroLaneDetail']:
-            try:
-                winrates[CORE_LANE_POSITIONS[lane['laneId']]][hero['heroId']] = lane['wins']
-            except KeyError:
-                continue
-
-    for hero in heroes_support_info['heroes']:
-        for lane in hero['heroLaneDetail']:
-            try:
-                winrates[SUPPORT_LANE_POSITIONS[lane['laneId']]][hero['heroId']] = lane['wins']
-            except KeyError:
-                continue
+    for heroes_role_info, role_lane_positions in [(heroes_core_info, CORE_LANE_POSITIONS), (heroes_support_info, SUPPORT_LANE_POSITIONS)]:
+        for hero in heroes_role_info['heroes']:
+            picks = hero['pickBan']['pick']['matchCount']
+            if picks / heroes_role_info['matchPickCount'] >= config['total_pickrate_treshold']:
+                for lane in hero['heroLaneDetail']:
+                    try:
+                        heroes_info_all[role_lane_positions[lane['laneId']]][hero['heroId']] = (lane['wins'], lane['matchCount'] / picks)
+                    except KeyError:
+                        continue
 
     def make_grid_category(i):
         return {
@@ -136,17 +132,13 @@ def main():
         'categories': [make_grid_category(i) for i in range(5)]
     }
 
-    hero_ids = {}
-    hero_basic_info = requests.get('https://api.stratz.com/api/v1/Hero').json()
-    for _, hero in hero_basic_info.items():
-        hero_ids[hero['displayName']] = hero['id']
-
-    for name, positions in config['hero_positions'].items():
-        for position in positions:
-            new_grid['categories'][position - 1]['hero_ids'].append(hero_ids[name])
+    for position, heroes_info in heroes_info_all.items():
+        for hero_id, hero_info in heroes_info.items():
+            if hero_info[1] >= config['lane_pickrate_treshold']:
+                new_grid['categories'][position - 1]['hero_ids'].append(hero_id)
 
     for i, _ in enumerate(new_grid['categories']):
-        new_grid['categories'][i]['hero_ids'].sort(key=lambda id_: winrates[i + 1][id_], reverse=True)
+        new_grid['categories'][i]['hero_ids'].sort(key=lambda id_: heroes_info_all[i + 1][id_][0], reverse=True)
 
     previous_heights = 0
     for category in new_grid['categories']:
