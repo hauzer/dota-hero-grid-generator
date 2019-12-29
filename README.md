@@ -19,6 +19,4 @@ If you want to run from source, follow these instructions:
 * Set up your grids, also in the aforementioned file.
 * Run with `py/Scripts/python ./dota_hero_grid_generator.py`.
 
-<br/>
-
 <sub>Data provided by [STRATZ](https://stratz.com).</sub>
