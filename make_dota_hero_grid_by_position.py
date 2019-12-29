@@ -4,171 +4,187 @@ import os
 from pathlib import Path
 import requests
 import sys
+import vdf
 
-if sys.platform == 'win32':
-    import winreg
 
 DOTA2_APP_ID = 570
 
-if sys.platform == 'win32':
-    STEAM_REGISTRY_ROOT_KEY = winreg.HKEY_CURRENT_USER
-    STEAM_REGISTRY_KEY = r'Software\Valve\Steam'
-    STEAM_REGISTRY_PATH_VALUE = 'SteamPath'
-    STEAM_REGISTRY_APPS_KEY = 'Apps'
-    STEAM_REGISTRY_APP_INSTALLED_VALUE = 'Installed'
-    STEAM_REGISTRY_USERS_KEY = 'Users'
 
-STEAM_USERDATA_FOLDER = 'userdata'
-STEAM_USERDATA_REMOTE_FOLDER = 'remote'
-DOTA2_CFG_FOLDER = 'cfg'
-GRID_CONFIG_FILE_NAME = 'hero_grid_config.json'
-
-CATEGORY_WIDTH = 1200
-CATEGORY_ROW_HEIGHT = 90
-CATEGORY_HEROES_PER_ROW = 22
-CATEGORY_BOTTOM_PADDING = 60
-
-
-POSITIONS = ['One', 'Two', 'Three', 'Four', 'Five']
-CORE_LANE_POSITIONS = {
-    1: 1,
-    2: 2,
-    3: 3
-}
-SUPPORT_LANE_POSITIONS = {
-    1: 5,
-    3: 4
-}
-
-RANK_IDS = {
-    'Herald': 1,
-    'Guardian': 2,
-    'Crusader': 3,
-    'Archon': 4,
-    'Legend': 5,
-    'Ancient': 6,
-    'Divine': 7,
-    'Immortal': 8
-}
+STEAM_CONFIG_FOLDER_NAME = 'config'
+STEAM_USERS_FILE_NAME = 'loginusers.vdf'
 
 
 class Error(Exception):
     pass
 
 
-def warning(msg):
-    return print('Warning: {}'.format(msg))
+class SteamUser:
+    def __init__(self, account_name, persona_name, id64):
+        self.account_name = account_name
+        self.persona_name = persona_name
+        self.id64 = int(id64)
+        self.id3 = self.id64 - 76561197960265728 # https://github.com/arhi3a/Steam-ID-Converter/blob/master/steam_id_converter.py#L7
+
+
+class HeroGrid:
+    POSITIONS = ['One', 'Two', 'Three', 'Four', 'Five']
+    CORE_LANE_POSITIONS = {
+        1: 1,
+        2: 2,
+        3: 3
+    }
+    SUPPORT_LANE_POSITIONS = {
+        1: 5,
+        3: 4
+    }
+
+    RANK_IDS = {
+        'Herald': 1,
+        'Guardian': 2,
+        'Crusader': 3,
+        'Archon': 4,
+        'Legend': 5,
+        'Ancient': 6,
+        'Divine': 7,
+        'Immortal': 8
+    }
+
+    CATEGORY_WIDTH = 1200
+    CATEGORY_ROW_HEIGHT = 90
+    CATEGORY_HEROES_PER_ROW = 22
+    CATEGORY_BOTTOM_PADDING = 60
+
+    def __init__(self, name, users, core_rank, support_rank, total_pickrate_treshold, lane_pickrate_treshold):
+        self.name = name
+        self.users = users
+        self.core_rank = core_rank
+        self.support_rank = support_rank
+        self.total_pickrate_treshold = total_pickrate_treshold
+        self.lane_pickrate_treshold = lane_pickrate_treshold
+
+        def make_grid_category(i):
+            return {
+                'category_name': 'Position {}'.format(self.POSITIONS[i]),
+                'x_position': 0,
+                'y_position': 0,
+                'width': self.CATEGORY_WIDTH,
+                'height': self.CATEGORY_ROW_HEIGHT,
+                'hero_ids': []
+            }
+
+        self.data = {
+            'config_name': self.name,
+            'categories': [make_grid_category(i) for i in range(5)]
+        }
+
+        heroes_info_all = {i: {} for i in range(1, 6)}
+        heroes_core_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=0&rank={}'.format(self.RANK_IDS[self.core_rank])).json()
+        heroes_support_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=1&rank={}'.format(self.RANK_IDS[self.support_rank])).json()
+
+        for heroes_role_info, role_lane_positions in [(heroes_core_info, self.CORE_LANE_POSITIONS), (heroes_support_info, self.SUPPORT_LANE_POSITIONS)]:
+            for hero in heroes_role_info['heroes']:
+                picks = hero['pickBan']['pick']['matchCount']
+                if picks / heroes_role_info['matchPickCount'] >= self.total_pickrate_treshold:
+                    for lane in hero['heroLaneDetail']:
+                        try:
+                            heroes_info_all[role_lane_positions[lane['laneId']]][hero['heroId']] = (lane['wins'], lane['matchCount'] / picks)
+                        except KeyError:
+                            continue
+
+        for position, heroes_info in heroes_info_all.items():
+            for hero_id, hero_info in heroes_info.items():
+                if hero_info[1] >= self.lane_pickrate_treshold:
+                    self.data['categories'][position - 1]['hero_ids'].append(hero_id)
+
+        for i, _ in enumerate(self.data['categories']):
+            self.data['categories'][i]['hero_ids'].sort(key=lambda id_: heroes_info_all[i + 1][id_][0], reverse=True)
+
+        previous_heights = 0
+        for category in self.data['categories']:
+            category['y_position'] = previous_heights
+            category['height'] *= max(1, math.ceil(len(category['hero_ids']) / self.CATEGORY_HEROES_PER_ROW))
+            previous_heights += category['height'] + self.CATEGORY_BOTTOM_PADDING
+
+
+class HeroGridsConfig:
+    STEAM_USERDATA_FOLDER_NAME = 'userdata'
+    STEAM_USERDATA_REMOTE_FOLDER_NAME = 'remote'
+
+    DOTA2_CFG_FOLDER_NAME = 'cfg'
+    GRID_CONFIG_FILE_NAME = 'hero_grid_config.json'
+
+    def __init__(self, steam_path, user):
+        self.steam_path = steam_path
+        self.user = user
+        self.path = \
+            Path(self.steam_path) / \
+            self.STEAM_USERDATA_FOLDER_NAME / \
+            str(self.user.id3) / \
+            str(DOTA2_APP_ID) / \
+            self.STEAM_USERDATA_REMOTE_FOLDER_NAME / \
+            self.DOTA2_CFG_FOLDER_NAME / \
+            self.GRID_CONFIG_FILE_NAME
+
+        try:
+            with open(self.path, 'r') as fp:
+                self.data = json.load(fp)
+        except:
+            self.data = {
+                'version': 3,
+                'configs': []
+            }
+
+    def add(self, new_grid):
+        replaced = False
+        for i, grid in enumerate(self.data['configs']):
+            if grid['config_name'] == new_grid.name:
+                self.data['configs'][i] = new_grid.data
+                replaced = True
+                break
+
+        if not replaced:
+            self.data['configs'].append(new_grid.data)
+
+    def save(self):
+        with open(self.path, 'w') as fp:
+            json.dump(self.data, fp, indent=4)
+
 
 def main():
     with open('config.json', 'r') as fp:
         config = json.load(fp)
 
-    if sys.platform == 'win32':
-        try:
-            steam_registry_key = winreg.OpenKey(STEAM_REGISTRY_ROOT_KEY, STEAM_REGISTRY_KEY)
-        except OSError:
-            raise Error(r'Steam registry keys missing.')
+    grids = []
+    grid_user_names = set()
+    for grid in config['grids']:
+        grids.append(HeroGrid(grid['name'], grid['users'], grid['core_rank'], grid['support_rank'], grid['total_pickrate_treshold'], grid['lane_pickrate_treshold']))
+        grid_user_names = grid_user_names.union(grids[-1].users)
 
-        try:
-            steam_registry_dota_key = winreg.OpenKey(steam_registry_key, r'{}\{}'.format(STEAM_REGISTRY_APPS_KEY, DOTA2_APP_ID))
-            if winreg.QueryValueEx(steam_registry_dota_key, STEAM_REGISTRY_APP_INSTALLED_VALUE)[0] == '0':
-                raise OSError
-        except OSError:
-            warning(r'Steam registry indicates Dota 2 is not installed.')
+    steam_users = []
+    steam_users_by_account_name = {}
+    with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r') as fp:
+        for id64, user in vdf.load(fp)['users'].items():
+            if user['AccountName'] in grid_user_names:
+                steam_users.append(SteamUser(user['AccountName'], user['PersonaName'], id64))
+                steam_users_by_account_name[user['AccountName']] = steam_users[-1]
 
-        trade_id = None
-        if config['trade_id'] == 0:
+    hero_grids_configs = []
+    hero_grids_configs_by_user_account_name = {}
+    for user in steam_users:
+        hero_grids_configs.append(HeroGridsConfig(config['steam']['path'], user))
+        hero_grids_configs_by_user_account_name[user.account_name] = hero_grids_configs[-1]
+    
+    for grid in grids:
+        for user in grid.users:
             try:
-                steam_registry_users_key = winreg.OpenKey(steam_registry_key, STEAM_REGISTRY_USERS_KEY)
-            except OSError:
-                raise Error(r'Steam registry user data missing.')
-                
-            try:
-                for i in range(2):
-                    trade_id = winreg.EnumKey(steam_registry_users_key, i)
-                    if i == 1:
-                        raise Error(r'Multiple Steam users detected. Please supply your trade ID in `config.json` under "trade_id".')
-            except OSError:
-                if not trade_id:
-                    raise Error(r'No Steam users detected. Try supplying your trade ID in `config.json` under "trade_id".')
-        else:
-            trade_id = config['trade_id']
+                hero_grids_configs_by_user_account_name[user].add(grid)
+            except KeyError:
+                pass
 
-        steam_path = Path(winreg.QueryValueEx(steam_registry_key, STEAM_REGISTRY_PATH_VALUE)[0])
-        grid_config_path = steam_path / STEAM_USERDATA_FOLDER / trade_id / str(DOTA2_APP_ID) / STEAM_USERDATA_REMOTE_FOLDER / DOTA2_CFG_FOLDER / GRID_CONFIG_FILE_NAME
-    else:
-        if len(sys.argv) == 2:
-            grid_config_path = Path(sys.argv[1]) / GRID_CONFIG_FILE_NAME
-        else:
-            raise Error(r'Argument missing: output directory.')
+    for hero_grids_config in hero_grids_configs:
+        hero_grids_config.save()
 
-    try:
-        with open(grid_config_path, 'r') as fp:
-            grids = json.load(fp)
-    except FileNotFoundError:
-        warning(r'Hero grid configuration file not found, creating.')
-        grids = {
-            'version': 3,
-            'configs': []
-        }
-
-    heroes_info_all = {i: {} for i in range(1, 6)}
-    heroes_core_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=0&rank={}'.format(RANK_IDS[config['core_rank']])).json()
-    heroes_support_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=1&rank={}'.format(RANK_IDS[config['support_rank']])).json()
-
-    for heroes_role_info, role_lane_positions in [(heroes_core_info, CORE_LANE_POSITIONS), (heroes_support_info, SUPPORT_LANE_POSITIONS)]:
-        for hero in heroes_role_info['heroes']:
-            picks = hero['pickBan']['pick']['matchCount']
-            if picks / heroes_role_info['matchPickCount'] >= config['total_pickrate_treshold']:
-                for lane in hero['heroLaneDetail']:
-                    try:
-                        heroes_info_all[role_lane_positions[lane['laneId']]][hero['heroId']] = (lane['wins'], lane['matchCount'] / picks)
-                    except KeyError:
-                        continue
-
-    def make_grid_category(i):
-        return {
-            'category_name': 'Position {}'.format(POSITIONS[i]),
-            'x_position': 0,
-            'y_position': 0,
-            'width': CATEGORY_WIDTH,
-            'height': CATEGORY_ROW_HEIGHT,
-            'hero_ids': []
-        }
-
-    new_grid = {
-        'config_name': config['grid_name'],
-        'categories': [make_grid_category(i) for i in range(5)]
-    }
-
-    for position, heroes_info in heroes_info_all.items():
-        for hero_id, hero_info in heroes_info.items():
-            if hero_info[1] >= config['lane_pickrate_treshold']:
-                new_grid['categories'][position - 1]['hero_ids'].append(hero_id)
-
-    for i, _ in enumerate(new_grid['categories']):
-        new_grid['categories'][i]['hero_ids'].sort(key=lambda id_: heroes_info_all[i + 1][id_][0], reverse=True)
-
-    previous_heights = 0
-    for category in new_grid['categories']:
-        category['y_position'] = previous_heights
-        category['height'] *= max(1, math.ceil(len(category['hero_ids']) / CATEGORY_HEROES_PER_ROW))
-        previous_heights += category['height'] + CATEGORY_BOTTOM_PADDING
-
-    replaced_grid = False
-    for i, grid in enumerate(grids['configs']):
-        if grid['config_name'] == new_grid['config_name']:
-            grids['configs'][i] = new_grid
-            replaced_grid = True
-            break
-
-    if not replaced_grid:
-        grids['configs'].append(new_grid)
-
-    with open(grid_config_path, 'w') as fp:
-        json.dump(grids, fp, indent=4)
-
-    print('Hero grid configuration file successfully updated!')
+    print('Job done!')
 
 
 if __name__ == '__main__':
