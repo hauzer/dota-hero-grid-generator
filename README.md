@@ -1,3 +1,5 @@
+[![Dota 2 Hero Grid Generator](https://img.youtube.com/vi/47wLqcSwGxo/0.jpg)](https://www.youtube.com/watch?v=47wLqcSwGxo) 
+
 # How To Use
 
 * Ensure you have Python 3 installed
