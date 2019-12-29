@@ -5,7 +5,6 @@
 * Ensure you have Python 3 installed
 * `git clone git@github.com:hauzer/dota-hero-grid-generator.git`
 * `cd make-dota-hero-grid-by-position`
-* `git checkout stratz`
 * `$PYTHON -m venv py`
 * `py/Scripts/python -m pip install --upgrade git+https://github.com/anthony-tuininga/cx_Freeze.git@master`
 * `py/Scripts/python -m pip install -r requirements.txt`
