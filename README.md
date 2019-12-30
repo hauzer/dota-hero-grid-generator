@@ -17,7 +17,7 @@ If you want to run from source, follow these instructions:
 
 * Point to the Steam installation directory in the `config.json` file.
 * Set up your grids, also in the aforementioned file.
-  * Multiple grids are supported, but you can have only one if you want.
+  * Multiple grids are supported, but you *can* have only one if you want.
   * Set up your Core/Support ranks.
   * The `users` key denotes which Steam users use that particular grid. These usernames are account names (the thing you use to login), not nicknames. You need to set up that as well.
   * `total_pickrate_treshold` denotes the minimum percentage of matches a hero needs to be picked in for them to even be included in the grid at all.
