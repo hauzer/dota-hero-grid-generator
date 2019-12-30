@@ -210,7 +210,8 @@ def main():
         hero_grids_config.save()
 
     for grid in grids:
-        print('{} updated for {}.'.format(grid.name, join_list_of_strings_with_commas(grid.users)))
+        users = ['{} ({})'.format(user, steam_users_by_account_name[user].persona_name) for user in grid.users]
+        print('{} updated for {}.'.format(grid.name, join_list_of_strings_with_commas(users)))
 
     print('\n{} grid{} updated for {} user{}!\n'.format(len(grids), 's' if len(grids) > 1 else '', len(steam_users), 's' if len(steam_users) > 1 else ''))
 
