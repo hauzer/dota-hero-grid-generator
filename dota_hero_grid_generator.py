@@ -150,23 +150,48 @@ class HeroGridsConfig:
             json.dump(self.data, fp, indent=4)
 
 
+def join_list_of_strings_with_commas(lst):
+    return ', '.join(lst).rstrip(', ')
+
+
 def main():
     with open('config.json', 'r') as fp:
         config = json.load(fp)
 
     grids = []
+    grids_without_users = []
     grid_user_names = set()
     for grid in config['grids']:
-        grids.append(HeroGrid(grid['name'], grid['users'], grid['core_rank'], grid['support_rank'], grid['total_pickrate_treshold'], grid['lane_pickrate_treshold']))
-        grid_user_names = grid_user_names.union(grids[-1].users)
+        hero_grid = HeroGrid(grid['name'], grid['users'], grid['core_rank'], grid['support_rank'], grid['total_pickrate_treshold'], grid['lane_pickrate_treshold'])
+        if not hero_grid.users:
+            grids_without_users.append(hero_grid.name)
+        else:
+            grids.append(hero_grid)
+            grid_user_names = grid_user_names.union(hero_grid.users)
+
+    if not grids:
+        raise Error('No grids found in the config!')
+
+    if not grid_user_names:
+        raise Error('None of the grids are assigned to any users!')
+
+    if grids_without_users:
+        print('Warning: These grids have no users: {}.'.format(join_list_of_strings_with_commas(grids_without_users)))
 
     steam_users = []
     steam_users_by_account_name = {}
     with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r') as fp:
         for id64, user in vdf.load(fp)['users'].items():
             if user['AccountName'] in grid_user_names:
+                grid_user_names.remove(user['AccountName'])
                 steam_users.append(SteamUser(user['AccountName'], user['PersonaName'], id64))
                 steam_users_by_account_name[user['AccountName']] = steam_users[-1]
+
+    if not steam_users:
+        raise Error('Usernames from the config don\'t match to any Steam users!')
+
+    if grid_user_names:
+        print('Warning: These usernames from the config weren\'t matched to any Steam users: {}.'.format(join_list_of_strings_with_commas(grid_user_names)))
 
     hero_grids_configs = []
     hero_grids_configs_by_user_account_name = {}
@@ -184,7 +209,10 @@ def main():
     for hero_grids_config in hero_grids_configs:
         hero_grids_config.save()
 
-    print('Job done!')
+    for grid in grids:
+        print('{} updated for {}.'.format(grid.name, join_list_of_strings_with_commas(grid.users)))
+
+    print('\n{} grid{} updated for {} user{}!\n'.format(len(grids), 's' if len(grids) > 1 else '', len(steam_users), 's' if len(steam_users) > 1 else ''))
 
 
 if __name__ == '__main__':
