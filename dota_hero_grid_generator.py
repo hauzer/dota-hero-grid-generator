@@ -26,18 +26,25 @@ class SteamUser:
         self.id3 = self.id64 - 76561197960265728 # https://github.com/arhi3a/Steam-ID-Converter/blob/master/steam_id_converter.py#L7
 
 
-class HeroGrid:
-    POSITIONS = ['One', 'Two', 'Three', 'Four', 'Five']
-    CORE_LANE_POSITIONS = {
-        1: 1,
-        2: 2,
-        3: 3
-    }
-    SUPPORT_LANE_POSITIONS = {
-        1: 5,
-        3: 4
-    }
+GRID_WIDTH = 1200
 
+
+ROLES = {
+    'core': 0,
+    'support': 1
+}
+
+
+LANES = {
+    'roam': 0,
+    'safe': 1,
+    'mid': 2,
+    'off': 3,
+    'jungle': 4
+}
+
+
+class HeroGridCategory:
     RANK_IDS = {
         'Herald': 1,
         'Guardian': 2,
@@ -49,61 +56,92 @@ class HeroGrid:
         'Immortal': 8
     }
 
-    CATEGORY_WIDTH = 1200
-    CATEGORY_ROW_HEIGHT = 90
-    CATEGORY_HEROES_PER_ROW = 22
-    CATEGORY_BOTTOM_PADDING = 60
+    HERO_WIDTH = 95
+    HERO_REAL_WIDTH = 85
+    HERO_HEIGHT = 135
+    HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, users, core_rank, support_rank, total_pickrate_treshold, lane_pickrate_treshold):
+    def __init__(self, name, role, lane, ranks, pickrate_treshold):
+        self.name = name
+        self.role = role
+        self.lane = lane
+        self.ranks = ranks
+        self.pickrate_treshold = pickrate_treshold
+        self.data = [{
+            'category_name': name,
+            'x_position': 0,
+            'y_position': 0,
+            'width': 0,
+            'height': 0,
+            'hero_ids': []
+        }]
+
+        info = requests.get('https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
+            self.role,
+            self.lane,
+            ','.join(str(self.RANK_IDS[rank]) for rank in self.ranks)
+        )).json()
+
+        x_position = 0
+        y_position = self.HERO_REAL_HEIGHT - self.HERO_HEIGHT
+        for hero in sorted(info['heroes'], key=lambda hero: hero['pickBan']['pick']['wins'], reverse=True):
+            picks = hero['pickBan']['pick']['matchCount']
+            if picks / (info['matchPickCount'] / 10) >= self.pickrate_treshold:
+                self.data.append({
+                    'category_name': '  {}%'.format(round(hero['pickBan']['pick']['wins'] * 100, 2)),
+                    'x_position': x_position,
+                    'y_position': y_position,
+                    'width': self.HERO_WIDTH,
+                    'height': self.HERO_HEIGHT,
+                    'hero_ids': [
+                        hero['heroId']
+                    ]
+                })
+
+                if x_position + self.HERO_REAL_WIDTH * 2 > 1200:
+                    x_position = 0
+                    y_position += self.HERO_REAL_HEIGHT
+                else:
+                    x_position += self.HERO_REAL_WIDTH
+
+        self.real_height = y_position + self.HERO_REAL_HEIGHT
+
+
+class HeroGrid:
+    def __init__(self, name, users, ranks, pickrate_treshold):
         self.name = name
         self.users = users
-        self.core_rank = core_rank
-        self.support_rank = support_rank
-        self.total_pickrate_treshold = total_pickrate_treshold
-        self.lane_pickrate_treshold = lane_pickrate_treshold
+        self.ranks = ranks
+        self.pickrate_treshold = pickrate_treshold
 
-        def make_grid_category(i):
-            return {
-                'category_name': 'Position {}'.format(self.POSITIONS[i]),
-                'x_position': 0,
-                'y_position': 0,
-                'width': self.CATEGORY_WIDTH,
-                'height': self.CATEGORY_ROW_HEIGHT,
-                'hero_ids': []
-            }
+        if self.name is None:
+            self.name = 'Winrates by Position ({})'.format(' + '.join((ranks)))
 
         self.data = {
             'config_name': self.name,
-            'categories': [make_grid_category(i) for i in range(5)]
+            'categories': []
         }
 
-        heroes_info_all = {i: {} for i in range(1, 6)}
-        heroes_core_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=0&rank={}'.format(self.RANK_IDS[self.core_rank])).json()
-        heroes_support_info = requests.get('https://api.stratz.com/api/v1/Hero/{{id}}?role=1&rank={}'.format(self.RANK_IDS[self.support_rank])).json()
+        categories_params = [
+            ('Carry', ROLES['core'], LANES['safe']),
+            ('Mid', ROLES['core'], LANES['mid']),
+            ('Offlane', ROLES['core'], LANES['off']),
+            ('Support', ROLES['support'], LANES['off']),
+            ('Hard Support', ROLES['support'], LANES['safe'])
+        ]
 
-        for heroes_role_info, role_lane_positions in [(heroes_core_info, self.CORE_LANE_POSITIONS), (heroes_support_info, self.SUPPORT_LANE_POSITIONS)]:
-            for hero in heroes_role_info['heroes']:
-                picks = hero['pickBan']['pick']['matchCount']
-                if picks / heroes_role_info['matchPickCount'] >= self.total_pickrate_treshold:
-                    for lane in hero['heroLaneDetail']:
-                        try:
-                            heroes_info_all[role_lane_positions[lane['laneId']]][hero['heroId']] = (lane['wins'], lane['matchCount'] / picks)
-                        except KeyError:
-                            continue
+        categories = []
+        cumulated_height = 0
+        for i, category_params in enumerate(categories_params):
+            category = HeroGridCategory(category_params[0], category_params[1], category_params[2], self.ranks, self.pickrate_treshold)
 
-        for position, heroes_info in heroes_info_all.items():
-            for hero_id, hero_info in heroes_info.items():
-                if hero_info[1] >= self.lane_pickrate_treshold:
-                    self.data['categories'][position - 1]['hero_ids'].append(hero_id)
+            if i > 0:
+                for subcategory in category.data:
+                    subcategory['y_position'] += cumulated_height
 
-        for i, _ in enumerate(self.data['categories']):
-            self.data['categories'][i]['hero_ids'].sort(key=lambda id_: heroes_info_all[i + 1][id_][0], reverse=True)
-
-        previous_heights = 0
-        for category in self.data['categories']:
-            category['y_position'] = previous_heights
-            category['height'] *= max(1, math.ceil(len(category['hero_ids']) / self.CATEGORY_HEROES_PER_ROW))
-            previous_heights += category['height'] + self.CATEGORY_BOTTOM_PADDING
+            self.data['categories'].extend(category.data)
+            categories.append(category)
+            cumulated_height += categories[-1].real_height + 60
 
 
 class HeroGridsConfig:
@@ -126,7 +164,7 @@ class HeroGridsConfig:
             self.GRID_CONFIG_FILE_NAME
 
         try:
-            with open(self.path, 'r') as fp:
+            with open(self.path, 'r', encoding='utf-8') as fp:
                 self.data = json.load(fp)
         except:
             self.data = {
@@ -146,23 +184,19 @@ class HeroGridsConfig:
             self.data['configs'].append(new_grid.data)
 
     def save(self):
-        with open(self.path, 'w') as fp:
+        with open(self.path, 'w', encoding='utf-8') as fp:
             json.dump(self.data, fp, indent=4)
 
 
-def join_list_of_strings_with_commas(lst):
-    return ', '.join(lst).rstrip(', ')
-
-
 def main():
-    with open('config.json', 'r') as fp:
+    with open('config.json', 'r', encoding='utf-8') as fp:
         config = json.load(fp)
 
     grids = []
     grids_without_users = []
     grid_user_names = set()
     for grid in config['grids']:
-        hero_grid = HeroGrid(grid['name'], grid['users'], grid['core_rank'], grid['support_rank'], grid['total_pickrate_treshold'], grid['lane_pickrate_treshold'])
+        hero_grid = HeroGrid(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'])
         if not hero_grid.users:
             grids_without_users.append(hero_grid.name)
         else:
@@ -176,11 +210,11 @@ def main():
         raise Error('None of the grids are assigned to any users!')
 
     if grids_without_users:
-        print('Warning: These grids have no users: {}.'.format(join_list_of_strings_with_commas(grids_without_users)))
+        print('Warning: These grids have no users: {}.'.format(', '.join(grids_without_users)))
 
     steam_users = []
     steam_users_by_account_name = {}
-    with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r') as fp:
+    with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r', encoding='utf-8') as fp:
         for id64, user in vdf.load(fp)['users'].items():
             if user['AccountName'] in grid_user_names:
                 grid_user_names.remove(user['AccountName'])
@@ -191,7 +225,7 @@ def main():
         raise Error('Usernames from the config don\'t match to any Steam users!')
 
     if grid_user_names:
-        print('Warning: These usernames from the config weren\'t matched to any Steam users: {}.'.format(join_list_of_strings_with_commas(grid_user_names)))
+        print('Warning: These usernames from the config weren\'t matched to any Steam users: {}.'.format(', '.join(grid_user_names)))
 
     hero_grids_configs = []
     hero_grids_configs_by_user_account_name = {}
@@ -211,7 +245,7 @@ def main():
 
     for grid in grids:
         users = ['{} ({})'.format(user, steam_users_by_account_name[user].persona_name) for user in grid.users]
-        print('{} updated for {}.'.format(grid.name, join_list_of_strings_with_commas(users)))
+        print('{} updated for {}.'.format(grid.name, ', '.join(users)))
 
     print('\n{} grid{} updated for {} user{}!\n'.format(len(grids), 's' if len(grids) > 1 else '', len(steam_users), 's' if len(steam_users) > 1 else ''))
 

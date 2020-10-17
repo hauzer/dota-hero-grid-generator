@@ -4,34 +4,19 @@
     },
     "grids": [
         {
-            "name": "Positions by Winrate (A/D)",
             "users": ["hauzerr"],
-
-            "core_rank": "Ancient",
-            "support_rank": "Divine",
-
-            "total_pickrate_treshold": 0.005,
-            "lane_pickrate_treshold": 0.05
+            "ranks": ["Ancient", "Divine"],
+            "pickrate_treshold": 0.0336
         },
         {
-            "name": "Positions by Winrate (L/L)",
-            "users": ["hauzerr"],
-
-            "core_rank": "Legend",
-            "support_rank": "Legend",
-
-            "total_pickrate_treshold": 0.005,
-            "lane_pickrate_treshold": 0.05
-        },
-        {
-            "name": "Positions by Winrate (C/C)",
             "users": ["hauzzerr"],
-
-            "core_rank": "Crusader",
-            "support_rank": "Crusader",
-
-            "total_pickrate_treshold": 0.005,
-            "lane_pickrate_treshold": 0.05
+            "ranks": ["Legend", "Ancient", "Divine"],
+            "pickrate_treshold": 0.0336
+        },
+        {
+            "users": ["hauzzzerr"],
+            "ranks": ["Crusader", "Archon", "Legend"],
+            "pickrate_treshold": 0.0336
         }
     ]
 }
