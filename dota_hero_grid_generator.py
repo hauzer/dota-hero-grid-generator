@@ -84,6 +84,7 @@ class HeroGridCategory:
 
         x_position = 0
         y_position = self.HERO_REAL_HEIGHT - self.HERO_HEIGHT
+        info['heroes'] = [hero for hero in info['heroes'] if 'pickBan' in hero]
         for hero in sorted(info['heroes'], key=lambda hero: hero['pickBan']['pick']['wins'], reverse=True):
             picks = hero['pickBan']['pick']['matchCount']
             if picks / (info['matchPickCount'] / 10) >= self.pickrate_treshold:
