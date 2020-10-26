@@ -1,8 +1,9 @@
+import asyncio
 import json
 import math
 import os
 from pathlib import Path
-import requests
+import aiohttp
 import sys
 import vdf
 
@@ -76,36 +77,44 @@ class HeroGridCategory:
             'hero_ids': []
         }]
 
-        info = requests.get('https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
-            self.role,
-            self.lane,
-            ','.join(str(self.RANK_IDS[rank]) for rank in self.ranks)
-        )).json()
+    @classmethod
+    async def create(cls, *args, **kwargs):
+        inst = cls(*args, **kwargs)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
+                inst.role,
+                inst.lane,
+                ','.join(str(inst.RANK_IDS[rank]) for rank in inst.ranks)
+            )) as resp:
+                info = await resp.json()
 
         x_position = 0
-        y_position = self.HERO_REAL_HEIGHT - self.HERO_HEIGHT
+        y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
         info['heroes'] = [hero for hero in info['heroes'] if 'pickBan' in hero]
         for hero in sorted(info['heroes'], key=lambda hero: hero['pickBan']['pick']['wins'], reverse=True):
             picks = hero['pickBan']['pick']['matchCount']
-            if picks / (info['matchPickCount'] / 10) >= self.pickrate_treshold:
-                self.data.append({
+            if picks / (info['matchPickCount'] / 10) >= inst.pickrate_treshold:
+                inst.data.append({
                     'category_name': '  {}%'.format(round(hero['pickBan']['pick']['wins'] * 100, 2)),
                     'x_position': x_position,
                     'y_position': y_position,
-                    'width': self.HERO_WIDTH,
-                    'height': self.HERO_HEIGHT,
+                    'width': inst.HERO_WIDTH,
+                    'height': inst.HERO_HEIGHT,
                     'hero_ids': [
                         hero['heroId']
                     ]
                 })
 
-                if x_position + self.HERO_REAL_WIDTH * 2 > 1200:
+                if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
                     x_position = 0
-                    y_position += self.HERO_REAL_HEIGHT
+                    y_position += inst.HERO_REAL_HEIGHT
                 else:
-                    x_position += self.HERO_REAL_WIDTH
+                    x_position += inst.HERO_REAL_WIDTH
 
-        self.real_height = y_position + self.HERO_REAL_HEIGHT
+        inst.real_height = y_position + inst.HERO_REAL_HEIGHT
+
+        return inst
 
 
 class HeroGrid:
@@ -123,6 +132,10 @@ class HeroGrid:
             'categories': []
         }
 
+    @classmethod
+    async def create(cls, *args, **kwargs):
+        inst = cls(*args, **kwargs)
+
         categories_params = [
             ('Carry', ROLES['core'], LANES['safe']),
             ('Mid', ROLES['core'], LANES['mid']),
@@ -131,18 +144,22 @@ class HeroGrid:
             ('Hard Support', ROLES['support'], LANES['safe'])
         ]
 
-        categories = []
-        cumulated_height = 0
-        for i, category_params in enumerate(categories_params):
-            category = HeroGridCategory(category_params[0], category_params[1], category_params[2], self.ranks, self.pickrate_treshold)
+        categories_coros = []
+        for category_params in categories_params:
+            categories_coros.append(HeroGridCategory.create(category_params[0], category_params[1], category_params[2], inst.ranks, inst.pickrate_treshold))
 
+        categories = await asyncio.gather(*categories_coros)
+
+        cumulated_height = 0
+        for i, category in enumerate(categories):
             if i > 0:
                 for subcategory in category.data:
                     subcategory['y_position'] += cumulated_height
 
-            self.data['categories'].extend(category.data)
-            categories.append(category)
-            cumulated_height += categories[-1].real_height + 60
+            inst.data['categories'].extend(category.data)
+            cumulated_height += category.real_height + 60
+
+        return inst
 
 
 class HeroGridsConfig:
@@ -189,15 +206,20 @@ class HeroGridsConfig:
             json.dump(self.data, fp, indent=4)
 
 
-def main():
+async def main():
     with open('config.json', 'r', encoding='utf-8') as fp:
         config = json.load(fp)
+
+    hero_grid_coros = []
+    for grid in config['grids']:
+        hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold']))
+
+    hero_grids = await asyncio.gather(*hero_grid_coros)
 
     grids = []
     grids_without_users = []
     grid_user_names = set()
-    for grid in config['grids']:
-        hero_grid = HeroGrid(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'])
+    for hero_grid in hero_grids:
         if not hero_grid.users:
             grids_without_users.append(hero_grid.name)
         else:
@@ -253,8 +275,8 @@ def main():
 
 if __name__ == '__main__':
     try:
-        main()
-    except requests.RequestException:
+        asyncio.get_event_loop().run_until_complete(main()) # https://github.com/aio-libs/aiohttp/issues/4324#issuecomment-676675779
+    except aiohttp.ClientError:
         raise Error(r'Failed to retreive data from Stratz')
     except Error as e:
         print('Error: {}'.format(e.args[0]))
