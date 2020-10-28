@@ -27,13 +27,12 @@ Windows:
   * Set up your rank(s).
   * The `users` key denotes which Steam users use that particular grid. These usernames are account names (the thing you use to login), not nicknames. You need to set up that as well.
   * `pickrate_treshold` denotes the minimum percentage of matches a hero needs to be picked in a role for them to be included in that role. The default of 0.0336 indicates that the script will only include those heroes who would have been picked at least twice in enough games to cover 119 pick choices for the respective role (which is two pick choices per game), that is at least once roughly every 30 games (in that role). Feel free to experiment (and check if my math adds up!).
-* Run with  
-  `$ dota_hero_grid_generator.exe`  
-  if using a release. If running from source,  
+* Run:
+  * If from a release, just double click on `dota_hero_grid_generator.exe`.
+  * If from source on Linux, use the following command:
   `$ py/bin/python ./dota_hero_grid_generator.py`  
-  on Linux, or  
+  * If from source on Windows, use the following command:
   `$ py/Scripts/python ./dota_hero_grid_generator.py`  
-  on Windows.
 * You'll be informed about which grid(s) were created/updated for which user(s).
 * Enjoy!
 
