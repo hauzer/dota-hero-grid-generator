@@ -1,21 +1,26 @@
 {
     "steam": {
-        "path": "C:\\Program Files (x86)\\Steam"
+        "path": "full\\path\\to\\steam\\directory"
     },
     "grids": [
         {
-            "users": ["hauzerr"],
-            "ranks": ["Ancient", "Divine"],
+            "users": ["account1"],
+            "ranks": ["Divine", "Immortal"],
             "pickrate_treshold": 0.0336
         },
         {
-            "users": ["hauzzerr"],
-            "ranks": ["Legend", "Ancient", "Divine"],
+            "users": ["account1", "account2"],
+            "ranks": ["Archon", "Legend"],
             "pickrate_treshold": 0.0336
         },
         {
-            "users": ["hauzzzerr"],
-            "ranks": ["Crusader", "Archon", "Legend"],
+            "users": ["account2"],
+            "ranks": ["Ancient"],
+            "pickrate_treshold": 0.0336
+        },
+        {
+            "users": ["account1", "account2", "account3"],
+            "ranks": ["Guardian", "Crusader"],
             "pickrate_treshold": 0.0336
         }
     ]
