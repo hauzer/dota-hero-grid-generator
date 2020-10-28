@@ -277,6 +277,9 @@ async def main():
 
     print('\n{} grid{} updated for {} user{}!\n'.format(len(grids), 's' if len(grids) > 1 else '', len(steam_users), 's' if len(steam_users) > 1 else ''))
 
+    if getattr(sys, "frozen", False):
+        input()
+
 
 if __name__ == '__main__':
     try:
