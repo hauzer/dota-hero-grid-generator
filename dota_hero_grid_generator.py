@@ -82,11 +82,16 @@ class HeroGridCategory:
         inst = cls(*args, **kwargs)
 
         async with aiohttp.ClientSession() as session:
-            async with session.get('https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
-                inst.role,
-                inst.lane,
-                ','.join(str(inst.RANK_IDS[rank]) for rank in inst.ranks)
-            )) as resp:
+            async with session.get(
+                'https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
+                    inst.role,
+                    inst.lane,
+                    ','.join(str(inst.RANK_IDS[rank]) for rank in inst.ranks)
+                ),
+                headers = {
+                    'content-type': 'application/json'
+                }
+            ) as resp:
                 info = await resp.json()
 
         x_position = 0
