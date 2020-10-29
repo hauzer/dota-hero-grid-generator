@@ -8,7 +8,7 @@ cchardet==2.1.6
 cffi==1.14.3
 chardet==3.0.4
 colorama==0.4.3
-cx-Freeze==6.1
+git+https://github.com/anthony-tuininga/cx_Freeze.git@master
 idna==2.10
 isort==4.3.21
 lazy-object-proxy==1.4.3
