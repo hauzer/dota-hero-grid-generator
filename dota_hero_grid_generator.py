@@ -92,7 +92,7 @@ class HeroGridCategory:
                     'content-type': 'application/json'
                 }
             ) as resp:
-                info = await resp.json()
+                info = await resp.json(content_type=None)
 
         x_position = 0
         y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
