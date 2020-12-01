@@ -1,6 +1,6 @@
 {
     "steam": {
-        "path": "full\\path\\to\\steam\\directory"
+        "path": "C:\\Program Files (x86)\\Steam"
     },
     "grids": [
         {
