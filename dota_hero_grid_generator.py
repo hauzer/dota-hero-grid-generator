@@ -92,7 +92,12 @@ class HeroGridCategory:
                     'content-type': 'application/json'
                 }
             ) as resp:
-                info = await resp.json(content_type=None)
+                try:
+                    info = await resp.json()
+                except Exception as e:
+                    print('{}\n\n'.format(resp.text()))
+                    raise Error('Failed to parse data from Stratz. The API may be down, your connection unstable,'
+                                'or something else. Received data is printed above. Exact error:\n\t{}'.format(repr(e)))
 
         x_position = 0
         y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
@@ -242,12 +247,15 @@ async def main():
 
     steam_users = []
     steam_users_by_account_name = {}
-    with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r', encoding='utf-8') as fp:
-        for id64, user in vdf.load(fp)['users'].items():
-            if user['AccountName'] in grid_user_names:
-                grid_user_names.remove(user['AccountName'])
-                steam_users.append(SteamUser(user['AccountName'], user['PersonaName'], id64))
-                steam_users_by_account_name[user['AccountName']] = steam_users[-1]
+    try:
+        with open(Path(config['steam']['path']) / STEAM_CONFIG_FOLDER_NAME / STEAM_USERS_FILE_NAME, 'r', encoding='utf-8') as fp:
+            for id64, user in vdf.load(fp)['users'].items():
+                if user['AccountName'] in grid_user_names:
+                    grid_user_names.remove(user['AccountName'])
+                    steam_users.append(SteamUser(user['AccountName'], user['PersonaName'], id64))
+                    steam_users_by_account_name[user['AccountName']] = steam_users[-1]
+    except FileNotFoundError:
+        raise Error('Steam path invalid, or Steam config files corrupt.')
 
     if not steam_users:
         raise Error('Usernames from the config don\'t match to any Steam users!')
@@ -277,15 +285,14 @@ async def main():
 
     print('\n{} grid{} updated for {} user{}!\n'.format(len(grids), 's' if len(grids) > 1 else '', len(steam_users), 's' if len(steam_users) > 1 else ''))
 
-    if getattr(sys, "frozen", False):
-        input()
-
 
 if __name__ == '__main__':
     try:
         asyncio.get_event_loop().run_until_complete(main()) # https://github.com/aio-libs/aiohttp/issues/4324#issuecomment-676675779
     except aiohttp.ClientError:
-        raise Error(r'Failed to retreive data from Stratz')
+        raise Error('Something happened with the network. Maybe Stratz is unavailable or your internet is down.')
     except Error as e:
-        print('Error: {}'.format(e.args[0]))
-        exit(1)
+        print('Error: {}\n'.format(e.args[0]))
+    finally:
+        if getattr(sys, "frozen", False):
+            input()
