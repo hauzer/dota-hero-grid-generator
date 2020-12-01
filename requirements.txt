@@ -13,4 +13,5 @@ pycparser==2.20
 typed-ast==1.4.0
 typing-extensions==3.7.4.3
 vdf==3.2
+wheel==0.35.1
 yarl==1.6.2
