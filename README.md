@@ -20,7 +20,7 @@ Windows:
 
 ## How To Use
 
-* Point to the Steam installation directory in the `config.json` file. Note that this is *not* where Dota is, but where the actual `steam.exe` resides.
+* Point to the Steam installation directory in the `config.json` file. Note that this is *not* where Dota is, but where the actual Steam executable resides (e.g. `steam.exe` on Windows).
 * Set up your grids, also in the aforementioned file.
   * Multiple grids are supported, but you *can* have only one if you want.
   * Name the grids if you wish, using the `name` key. Otherwise, they'll be named automatically.
