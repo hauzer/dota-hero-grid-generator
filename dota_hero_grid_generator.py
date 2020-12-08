@@ -122,7 +122,10 @@ class HeroGridCategory:
                 else:
                     x_position += inst.HERO_REAL_WIDTH
 
-        inst.real_height = y_position + inst.HERO_REAL_HEIGHT
+        if x_position == 0:
+            inst.real_height = y_position
+        else:
+            inst.real_height = y_position + inst.HERO_REAL_HEIGHT
 
         return inst
 
