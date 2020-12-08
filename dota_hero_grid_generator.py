@@ -106,7 +106,7 @@ class HeroGridCategory:
             picks = hero['pickBan']['pick']['matchCount']
             if picks / (info['matchPickCount'] / 10) >= inst.pickrate_treshold:
                 inst.data.append({
-                    'category_name': '  {}%'.format(round(hero['pickBan']['pick']['wins'] * 100, 2)),
+                    'category_name': '  {:.2f}%'.format(round(hero['pickBan']['pick']['wins'] * 100, 2)),
                     'x_position': x_position,
                     'y_position': y_position,
                     'width': inst.HERO_WIDTH,
