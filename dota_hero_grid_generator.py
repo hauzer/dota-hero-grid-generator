@@ -1,7 +1,5 @@
 import asyncio
 import json
-import math
-import os
 from pathlib import Path
 import aiohttp
 import sys
@@ -30,42 +28,15 @@ class SteamUser:
 GRID_WIDTH = 1200
 
 
-ROLES = {
-    'core': 0,
-    'support': 1
-}
-
-
-LANES = {
-    'roam': 0,
-    'safe': 1,
-    'mid': 2,
-    'off': 3,
-    'jungle': 4
-}
-
-
 class HeroGridCategory:
-    RANK_IDS = {
-        'Herald': 1,
-        'Guardian': 2,
-        'Crusader': 3,
-        'Archon': 4,
-        'Legend': 5,
-        'Ancient': 6,
-        'Divine': 7,
-        'Immortal': 8
-    }
-
     HERO_WIDTH = 95
     HERO_REAL_WIDTH = 85
     HERO_HEIGHT = 135
     HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, role, lane, ranks, pickrate_treshold):
+    def __init__(self, name, position, ranks, pickrate_treshold):
         self.name = name
-        self.role = role
-        self.lane = lane
+        self.position = position
         self.ranks = ranks
         self.pickrate_treshold = pickrate_treshold
         self.data = [{
@@ -82,12 +53,24 @@ class HeroGridCategory:
         inst = cls(*args, **kwargs)
 
         async with aiohttp.ClientSession() as session:
+            query = f'''
+                {{
+                    heroStats {{
+                        winWeek(
+                            take: 1,
+                            bracketIds: [{','.join([rank.upper() for rank in inst.ranks])}],
+                            positionIds: [{inst.position}],
+                            gameModeIds: [ALL_PICK_RANKED]
+                        ) {{
+                            heroId,
+                            matchCount,
+                            winCount
+                        }}
+                    }}
+                }}
+            '''
             async with session.get(
-                'https://api.stratz.com/api/v1/Hero/directory/detail/?role={}&lane={}&rank={}'.format(
-                    inst.role,
-                    inst.lane,
-                    ','.join(str(inst.RANK_IDS[rank]) for rank in inst.ranks)
-                ),
+                f'https://api.stratz.com/graphql/?query={query}',
                 headers = {
                     'content-type': 'application/json'
                 }
@@ -99,14 +82,15 @@ class HeroGridCategory:
                     raise Error('Failed to parse data from Stratz. The API may be down, your connection unstable,'
                                 'or something else. Received data is printed above. Exact error:\n\t{}'.format(repr(e)))
 
+        heroes = info['data']['heroStats']['winWeek']
+        all_match_count = sum([hero['matchCount'] for hero in heroes])
+
         x_position = 0
-        y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
-        info['heroes'] = [hero for hero in info['heroes'] if 'pickBan' in hero]
-        for hero in sorted(info['heroes'], key=lambda hero: hero['pickBan']['pick']['wins'], reverse=True):
-            picks = hero['pickBan']['pick']['matchCount']
-            if picks / (info['matchPickCount'] / 10) >= inst.pickrate_treshold:
+        y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT        
+        for hero in sorted(heroes, key=lambda hero: hero['winCount'] / hero['matchCount'], reverse=True):
+            if hero['matchCount'] / (all_match_count / 10) >= inst.pickrate_treshold:
                 inst.data.append({
-                    'category_name': '  {:.2f}%'.format(round(hero['pickBan']['pick']['wins'] * 100, 2)),
+                    'category_name': '  {:.2f}%'.format(round(hero['winCount'] / hero['matchCount'] * 100, 2)),
                     'x_position': x_position,
                     'y_position': y_position,
                     'width': inst.HERO_WIDTH,
@@ -149,17 +133,9 @@ class HeroGrid:
     async def create(cls, *args, **kwargs):
         inst = cls(*args, **kwargs)
 
-        categories_params = [
-            ('Carry', ROLES['core'], LANES['safe']),
-            ('Mid', ROLES['core'], LANES['mid']),
-            ('Offlane', ROLES['core'], LANES['off']),
-            ('Support', ROLES['support'], LANES['off']),
-            ('Hard Support', ROLES['support'], LANES['safe'])
-        ]
-
         categories_coros = []
-        for category_params in categories_params:
-            categories_coros.append(HeroGridCategory.create(category_params[0], category_params[1], category_params[2], inst.ranks, inst.pickrate_treshold))
+        for name, position in zip(['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], [f'POSITION_{n}' for n in range(1,6)]):
+            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold))
 
         categories = await asyncio.gather(*categories_coros)
 
