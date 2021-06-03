@@ -4,7 +4,7 @@
 
 If you're on Windows, you can download the latest [release](https://github.com/hauzer/dota-hero-grid-generator/releases). No guarantees it's the most up-to-date version, though.
 
-If you want to run from source, ensure that you have Python 3.7.1+ and the `venv` module installed; how to install this depends on your system. Then follow the instructions below.
+If you want to run from source, ensure that you have Python 3.9.1+ and the `venv` module installed; how to install this depends on your system. Then follow the instructions below.
 
 Linux:
 *  `$ git clone https://github.com/hauzer/dota-hero-grid-generator.git`
