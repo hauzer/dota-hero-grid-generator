@@ -2,6 +2,7 @@ import asyncio
 import json
 from pathlib import Path
 import aiohttp
+import socket
 import sys
 import vdf
 
@@ -52,7 +53,12 @@ class HeroGridCategory:
     async def create(cls, *args, **kwargs):
         inst = cls(*args, **kwargs)
 
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(
+            family=socket.AF_INET,
+            ssl=False,
+        )
+
+        async with aiohttp.ClientSession(connector=connector) as session:
             query = f'''
                 {{
                     heroStats {{
