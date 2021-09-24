@@ -75,20 +75,26 @@ class HeroGridCategory:
                     }}
                 }}
             '''
-            async with session.get(
-                f'https://api.stratz.com/graphql/?query={query}',
-                headers = {
-                    'content-type': 'application/json'
-                }
-            ) as resp:
-                try:
-                    info = await resp.json()
-                except Exception as e:
-                    print('{}\n\n'.format(resp.text()))
-                    raise Error('Failed to parse data from Stratz. The API may be down, your connection unstable,'
-                                'or something else. Received data is printed above. Exact error:\n\t{}'.format(repr(e)))
 
-        heroes = info['data']['heroStats']['winWeek']
+            async def make_request(api):
+                resp = await session.get(
+                    f'{api}?query={query}',
+                    headers = {
+                        'content-type': 'application/json'
+                    }
+                )
+                return await resp.json()
+
+            try:
+                data = (await make_request('https://api.stratz.com/graphql'))['data']
+            except:
+                try:
+                    data = (await make_request('https://apibeta.stratz.com/graphql'))['data']
+                except Exception as e:
+                    raise Error(f'Failed to parse data from Stratz. The API may be down, your connection unstable, '
+                                f'or something else. Exact error:\n\n{e}')
+
+        heroes = data['heroStats']['winWeek']
         all_match_count = sum([hero['matchCount'] for hero in heroes])
 
         x_position = 0
