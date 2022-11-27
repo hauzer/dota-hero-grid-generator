@@ -1,4 +1,7 @@
 {
+    "stratz": {
+        "token": "Get your own at https://stratz.com/api"
+    },
     "steam": {
         "path": "C:\\Program Files (x86)\\Steam"
     },

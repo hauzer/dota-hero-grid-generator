@@ -35,7 +35,7 @@ class HeroGridCategory:
     HERO_HEIGHT = 135
     HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, position, ranks, pickrate_treshold):
+    def __init__(self, name, position, ranks, pickrate_treshold, stratz_token):
         self.name = name
         self.position = position
         self.ranks = ranks
@@ -48,6 +48,7 @@ class HeroGridCategory:
             'height': 0,
             'hero_ids': []
         }]
+        self.stratz_token = stratz_token
 
     @classmethod
     async def create(cls, *args, **kwargs):
@@ -80,9 +81,11 @@ class HeroGridCategory:
                 resp = await session.get(
                     f'{api}?query={query}',
                     headers = {
+                        'Authorization': f'Bearer {inst.stratz_token}',
                         'content-type': 'application/json'
                     }
                 )
+
                 return await resp.json()
 
             try:
@@ -92,7 +95,7 @@ class HeroGridCategory:
                     data = (await make_request('https://apibeta.stratz.com/graphql'))['data']
                 except Exception as e:
                     raise Error(f'Failed to parse data from Stratz. The API may be down, your connection unstable, '
-                                f'or something else. Exact error:\n\n{e}')
+                                f'or something else. Exact error:\n\n{e}\n\nData:{data}')
 
         heroes = data['heroStats']['winWeek']
         all_match_count = sum([hero['matchCount'] for hero in heroes])
@@ -127,7 +130,7 @@ class HeroGridCategory:
 
 
 class HeroGrid:
-    def __init__(self, name, users, ranks, pickrate_treshold):
+    def __init__(self, name, users, ranks, pickrate_treshold, stratz_token):
         self.name = name
         self.users = users
         self.ranks = ranks
@@ -141,13 +144,15 @@ class HeroGrid:
             'categories': []
         }
 
+        self.stratz_token = stratz_token
+
     @classmethod
     async def create(cls, *args, **kwargs):
         inst = cls(*args, **kwargs)
 
         categories_coros = []
         for name, position in zip(['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], [f'POSITION_{n}' for n in range(1,6)]):
-            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold))
+            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold, inst.stratz_token))
 
         categories = await asyncio.gather(*categories_coros)
 
@@ -213,7 +218,7 @@ async def main():
 
     hero_grid_coros = []
     for grid in config['grids']:
-        hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold']))
+        hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'], config['stratz']['token']))
 
     hero_grids = await asyncio.gather(*hero_grid_coros)
 
