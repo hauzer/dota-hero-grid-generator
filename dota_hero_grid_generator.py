@@ -81,6 +81,7 @@ class HeroGridCategory:
                 resp = await session.get(
                     f'{api}?query={query}',
                     headers = {
+                        'User-Agent': 'STRATZ_API',
                         'Authorization': f'Bearer {inst.stratz_token}',
                         'content-type': 'application/json'
                     }
@@ -284,7 +285,7 @@ async def main():
 
 if __name__ == '__main__':
     try:
-        asyncio.get_event_loop().run_until_complete(main()) # https://github.com/aio-libs/aiohttp/issues/4324#issuecomment-676675779
+        asyncio.run(main())
     except aiohttp.ClientError:
         raise Error('Something happened with the network. Maybe Stratz is unavailable or your internet is down.')
     except Error as e:
