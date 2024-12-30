@@ -35,7 +35,7 @@ class HeroGridCategory:
     HERO_HEIGHT = 135
     HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, position, ranks, pickrate_treshold, stratz_token):
+    def __init__(self, name, position, ranks, pickrate_treshold, stratz_token, http_session=None):
         self.name = name
         self.position = position
         self.ranks = ranks
@@ -50,53 +50,59 @@ class HeroGridCategory:
         }]
         self.stratz_token = stratz_token
 
+        if http_session is None:
+            connector = aiohttp.TCPConnector(
+                family=socket.AF_INET,
+                ssl=False,
+            )
+
+            self.http_session = aiohttp.ClientSession(connector=connector)
+        else:
+            self.http_session = http_session
+
     @classmethod
     async def create(cls, *args, **kwargs):
         inst = cls(*args, **kwargs)
 
-        connector = aiohttp.TCPConnector(
-            family=socket.AF_INET,
-            ssl=False,
-        )
-
-        async with aiohttp.ClientSession(connector=connector) as session:
-            query = f'''
-                {{
-                    heroStats {{
-                        winWeek(
-                            take: 1,
-                            bracketIds: [{','.join([rank.upper() for rank in inst.ranks])}],
-                            positionIds: [{inst.position}],
-                            gameModeIds: [ALL_PICK_RANKED]
-                        ) {{
-                            heroId,
-                            matchCount,
-                            winCount
-                        }}
+        query = f'''
+            {{
+                heroStats {{
+                    winWeek(
+                        take: 1,
+                        bracketIds: [{','.join([rank.upper() for rank in inst.ranks])}],
+                        positionIds: [{inst.position}],
+                        gameModeIds: [ALL_PICK_RANKED]
+                    ) {{
+                        heroId,
+                        matchCount,
+                        winCount
                     }}
                 }}
-            '''
+            }}
+        '''
 
-            async def make_request(api):
-                resp = await session.get(
-                    f'{api}?query={query}',
-                    headers = {
-                        'User-Agent': 'STRATZ_API',
-                        'Authorization': f'Bearer {inst.stratz_token}',
-                        'content-type': 'application/json'
-                    }
-                )
+        async def make_request(api):
+            resp = await inst.http_session.get(
+                f'{api}?query={query}',
+                headers = {
+                    'User-Agent': 'STRATZ_API',
+                    'Authorization': f'Bearer {inst.stratz_token}',
+                    'content-type': 'application/json'
+                }
+            )
 
-                return await resp.json()
+            text = await resp.text()
 
             try:
-                data = (await make_request('https://api.stratz.com/graphql'))['data']
-            except:
-                try:
-                    data = (await make_request('https://apibeta.stratz.com/graphql'))['data']
-                except Exception as e:
-                    raise Error(f'Failed to parse data from Stratz. The API may be down, your connection unstable, '
-                                f'or something else. Exact error:\n\n{e}\n\nData:{data}')
+                return json.loads(text)
+            except Exception as e:
+                raise Error(f'Failed to parse data from Stratz. The API may be down, your connection unstable, '
+                            f'or something else. Exact error:\n\n{e}\n\nData:{text}')
+
+        try:
+            data = (await make_request('https://api.stratz.com/graphql'))['data']
+        except:
+            data = (await make_request('https://apibeta.stratz.com/graphql'))['data']
 
         heroes = data['heroStats']['winWeek']
         all_match_count = sum([hero['matchCount'] for hero in heroes])
@@ -131,7 +137,7 @@ class HeroGridCategory:
 
 
 class HeroGrid:
-    def __init__(self, name, users, ranks, pickrate_treshold, stratz_token):
+    def __init__(self, name, users, ranks, pickrate_treshold, stratz_token, http_session=None):
         self.name = name
         self.users = users
         self.ranks = ranks
@@ -146,6 +152,8 @@ class HeroGrid:
         }
 
         self.stratz_token = stratz_token
+        
+        self.http_session = http_session
 
     @classmethod
     async def create(cls, *args, **kwargs):
@@ -153,7 +161,7 @@ class HeroGrid:
 
         categories_coros = []
         for name, position in zip(['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], [f'POSITION_{n}' for n in range(1,6)]):
-            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold, inst.stratz_token))
+            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold, inst.stratz_token, inst.http_session))
 
         categories = await asyncio.gather(*categories_coros)
 
@@ -217,11 +225,18 @@ async def main():
     with open('config.json', 'r', encoding='utf-8') as fp:
         config = json.load(fp)
 
-    hero_grid_coros = []
-    for grid in config['grids']:
-        hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'], config['stratz']['token']))
+    connector = aiohttp.TCPConnector(
+        family=socket.AF_INET,
+        ssl=False,
+        limit=5
+    )
 
-    hero_grids = await asyncio.gather(*hero_grid_coros)
+    async with aiohttp.ClientSession(connector=connector) as http_session:
+        hero_grid_coros = []
+        for grid in config['grids']:
+            hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'], config['stratz']['token'], http_session))
+
+        hero_grids = await asyncio.gather(*hero_grid_coros)
 
     grids = []
     grids_without_users = []
