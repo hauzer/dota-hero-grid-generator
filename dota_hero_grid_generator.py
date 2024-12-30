@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('ignore')
+
 import asyncio
 import json
 from pathlib import Path
