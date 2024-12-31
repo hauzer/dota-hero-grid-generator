@@ -26,6 +26,7 @@
 			"weeks": 4
         },
         {
+            "name": "Clownin",
             "users": ["account2"],
             "ranks": ["Ancient"],
 			"modes": ["ALL_PICK", "ALL_PICK_RANKED"],
@@ -35,6 +36,7 @@
 			"weeks": 3
         },
         {
+            "name": "Playing with the Boys",
             "users": ["account1", "account2", "account3"],
             "ranks": ["Guardian", "Crusader"],
 			"modes": ["ALL_PICK", "ALL_PICK_RANKED"],
