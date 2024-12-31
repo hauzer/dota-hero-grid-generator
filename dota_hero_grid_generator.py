@@ -1,12 +1,16 @@
 import warnings
 warnings.filterwarnings('ignore')
 
+import aiohttp
 import asyncio
 import json
+import os
 from pathlib import Path
-import aiohttp
 import socket
 import sys
+import traceback
+import time
+import uuid
 import vdf
 
 
@@ -59,9 +63,17 @@ class HeroGridCategory:
                 ssl=False,
             )
 
-            self.http_session = aiohttp.ClientSession(connector=connector)
+            cookie_jar = aiohttp.CookieJar(unsafe=True)
+
+            self.http_session = aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar)
+
+            self.http_session.rate_limiting = {
+                'requests_per_second': 5
+            }
         else:
             self.http_session = http_session
+
+        self.http_session.rate_limiting['requests'] = []
 
     @classmethod
     async def create(cls, *args, **kwargs):
@@ -85,27 +97,48 @@ class HeroGridCategory:
         '''
 
         async def make_request(api):
-            resp = await inst.http_session.get(
-                f'{api}?query={query}',
+            while True:
+                inst.http_session.rate_limiting['requests'] = [request for request in inst.http_session.rate_limiting['requests'] if request['timestamp'] < time.time() - 1]
+                if len(inst.http_session.rate_limiting['requests']) < inst.http_session.rate_limiting['requests_per_second']:
+                    break
+
+                await asyncio.sleep(0.5)
+
+            id = uuid.uuid4()
+            inst.http_session.rate_limiting['requests'].append({
+                'id': id,
+                'timestamp': time.time()
+            })
+            resp = await inst.http_session.post(
+                f'{api}',
+                data=json.dumps({'query': query}),
                 headers = {
                     'User-Agent': 'STRATZ_API',
                     'Authorization': f'Bearer {inst.stratz_token}',
-                    'content-type': 'application/json'
+                    'Content-Type': 'application/json'
                 }
             )
+
+            inst.http_session.rate_limiting['requests'] = [request for request in inst.http_session.rate_limiting['requests'] if request['id'].int != id.int]
 
             text = await resp.text()
 
             try:
-                return json.loads(text)
+                json_data = json.loads(text)
+
+                try:
+                    if json_data['message'] == 'API rate limit exceeded':
+                        print('You\'re being rate-limited by Stratz. Lower requests_per_second in the configuration file.\n\n')
+                        os._exit()
+                except:
+                    pass
+
+                return json.loads(text)['data']
             except Exception as e:
                 raise Error(f'Failed to parse data from Stratz. The API may be down, your connection unstable, '
-                            f'or something else. Exact error:\n\n{e}\n\nData:{text}')
+                            f'or something else. Exact error:\n\n{traceback.format_exc()}\n\nData:{text}')
 
-        try:
-            data = (await make_request('https://api.stratz.com/graphql'))['data']
-        except:
-            data = (await make_request('https://apibeta.stratz.com/graphql'))['data']
+        data = (await make_request('https://api.stratz.com/graphql'))
 
         heroes = data['heroStats']['winWeek']
         all_match_count = sum([hero['matchCount'] for hero in heroes])
@@ -231,10 +264,16 @@ async def main():
     connector = aiohttp.TCPConnector(
         family=socket.AF_INET,
         ssl=False,
-        limit=5
+        limit=config['stratz']['requests_per_second']
     )
 
-    async with aiohttp.ClientSession(connector=connector) as http_session:
+    cookie_jar = aiohttp.CookieJar(unsafe=True)
+
+    async with aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar) as http_session:
+        http_session.rate_limiting = {
+            'requests_per_second': config['stratz']['requests_per_second']
+        }
+
         hero_grid_coros = []
         for grid in config['grids']:
             hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'], config['stratz']['token'], http_session))

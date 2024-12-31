@@ -1,6 +1,7 @@
 {
     "stratz": {
-        "token": "Get your own at https://stratz.com/api"
+        "token": "Get your own at https://stratz.com/api",
+		"requests_per_second": 5
     },
     "steam": {
         "path": "C:\\Program Files (x86)\\Steam"
