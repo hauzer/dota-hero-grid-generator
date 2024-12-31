@@ -42,11 +42,15 @@ class HeroGridCategory:
     HERO_HEIGHT = 135
     HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, position, ranks, pickrate_treshold, stratz_token, http_session=None):
+    def __init__(self, name, position, ranks, modes, winrate_treshold, pickrate_treshold, show_pickrates, take_weeks, stratz_token, http_session):
         self.name = name
         self.position = position
         self.ranks = ranks
+        self.modes = modes
+        self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
+        self.show_pickrates = show_pickrates
+        self.take_weeks = take_weeks
         self.data = [{
             'category_name': name,
             'x_position': 0,
@@ -56,24 +60,7 @@ class HeroGridCategory:
             'hero_ids': []
         }]
         self.stratz_token = stratz_token
-
-        if http_session is None:
-            connector = aiohttp.TCPConnector(
-                family=socket.AF_INET,
-                ssl=False,
-            )
-
-            cookie_jar = aiohttp.CookieJar(unsafe=True)
-
-            self.http_session = aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar)
-
-            self.http_session.rate_limiting = {
-                'requests_per_second': 5
-            }
-        else:
-            self.http_session = http_session
-
-        self.http_session.rate_limiting['requests'] = []
+        self.http_session = http_session
 
     @classmethod
     async def create(cls, *args, **kwargs):
@@ -83,10 +70,10 @@ class HeroGridCategory:
             {{
                 heroStats {{
                     winWeek(
-                        take: 1,
+                        take: {inst.take_weeks},
                         bracketIds: [{','.join([rank.upper() for rank in inst.ranks])}],
                         positionIds: [{inst.position}],
-                        gameModeIds: [ALL_PICK_RANKED]
+                        gameModeIds: [{','.join([mode.upper() for mode in inst.modes])}]
                     ) {{
                         heroId,
                         matchCount,
@@ -98,7 +85,7 @@ class HeroGridCategory:
 
         async def make_request(api):
             while True:
-                inst.http_session.rate_limiting['requests'] = [request for request in inst.http_session.rate_limiting['requests'] if request['timestamp'] < time.time() - 1]
+                inst.http_session.rate_limiting['requests'] = [request for request in inst.http_session.rate_limiting['requests'] if request['timestamp'] >= time.time() - 1]
                 if len(inst.http_session.rate_limiting['requests']) < inst.http_session.rate_limiting['requests_per_second']:
                     break
 
@@ -140,44 +127,94 @@ class HeroGridCategory:
 
         data = (await make_request('https://api.stratz.com/graphql'))
 
-        heroes = data['heroStats']['winWeek']
+        heroes_raw = data['heroStats']['winWeek']
+        heroes = []
+        for hero in heroes_raw:
+            if any([hero['heroId'] == h['heroId'] for h in heroes]):
+                continue
+
+            for h in [h for h in heroes_raw if hero['heroId'] == h['heroId']][1:]:
+                hero['winCount'] += h['winCount']
+                hero['matchCount'] += h['matchCount']
+
+            heroes.append(hero)
+
         all_match_count = sum([hero['matchCount'] for hero in heroes])
 
-        x_position = 0
-        y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT        
-        for hero in sorted(heroes, key=lambda hero: hero['winCount'] / hero['matchCount'], reverse=True):
-            if hero['matchCount'] / (all_match_count / 10) >= inst.pickrate_treshold:
-                inst.data.append({
-                    'category_name': '  {:.2f}%'.format(round(hero['winCount'] / hero['matchCount'] * 100, 2)),
-                    'x_position': x_position,
-                    'y_position': y_position,
-                    'width': inst.HERO_WIDTH,
-                    'height': inst.HERO_HEIGHT,
-                    'hero_ids': [
-                        hero['heroId']
-                    ]
-                })
+        for hero in heroes:
+            hero['pickRate'] = round(hero['matchCount'] / (all_match_count / 10) * 100, 2)
+            hero['winRate'] = round(hero['winCount'] / hero['matchCount'] * 100, 2)
 
-                if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
-                    x_position = 0
-                    y_position += inst.HERO_REAL_HEIGHT
+        x_position = 0
+        y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
+        for hero in sorted(heroes, key=lambda hero: hero['winRate'], reverse=True):
+            if hero['winRate'] >= inst.winrate_treshold and hero['pickRate'] >= inst.pickrate_treshold:
+                if inst.show_pickrates:
+                    inst.data.append({
+                        'category_name': '  {:.2f}%'.format(hero['winRate']),
+                        'x_position': x_position,
+                        'y_position': y_position,
+                        'width': 0,
+                        'height': 0,
+                        'hero_ids': []
+                    })
+
+                    inst.data.append({
+                        'category_name': '  {:.2f}%'.format(hero['pickRate']),
+                        'x_position': x_position,
+                        'y_position': y_position + 20,
+                        'width': inst.HERO_WIDTH,
+                        'height': inst.HERO_HEIGHT,
+                        'hero_ids': [
+                            hero['heroId']
+                        ]
+                    })
+
+                    if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
+                        x_position = 0
+                        y_position += inst.HERO_REAL_HEIGHT + 20
+                    else:
+                        x_position += inst.HERO_REAL_WIDTH
                 else:
-                    x_position += inst.HERO_REAL_WIDTH
+                    inst.data.append({
+                        'category_name': '  {:.2f}%'.format(hero['winRate']),
+                        'x_position': x_position,
+                        'y_position': y_position,
+                        'width': inst.HERO_WIDTH,
+                        'height': inst.HERO_HEIGHT,
+                        'hero_ids': [
+                            hero['heroId']
+                        ]
+                    })
+
+                    if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
+                        x_position = 0
+                        y_position += inst.HERO_REAL_HEIGHT
+                    else:
+                        x_position += inst.HERO_REAL_WIDTH
+
 
         if x_position == 0:
             inst.real_height = y_position
         else:
             inst.real_height = y_position + inst.HERO_REAL_HEIGHT
 
+            if inst.show_pickrates:
+                inst.real_height += 20
+
         return inst
 
 
 class HeroGrid:
-    def __init__(self, name, users, ranks, pickrate_treshold, stratz_token, http_session=None):
+    def __init__(self, name, users, ranks, modes, winrate_treshold, pickrate_treshold, show_pickrates, take_weeks, stratz_token, http_session):
         self.name = name
         self.users = users
         self.ranks = ranks
+        self.modes = modes
+        self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
+        self.show_pickrates = show_pickrates
+        self.take_weeks = take_weeks
 
         if self.name is None:
             self.name = 'Winrates by Position ({})'.format(' + '.join((ranks)))
@@ -197,7 +234,7 @@ class HeroGrid:
 
         categories_coros = []
         for name, position in zip(['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], [f'POSITION_{n}' for n in range(1,6)]):
-            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.pickrate_treshold, inst.stratz_token, inst.http_session))
+            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.modes, inst.winrate_treshold, inst.pickrate_treshold, inst.show_pickrates, inst.take_weeks, inst.stratz_token, inst.http_session))
 
         categories = await asyncio.gather(*categories_coros)
 
@@ -271,12 +308,13 @@ async def main():
 
     async with aiohttp.ClientSession(connector=connector, cookie_jar=cookie_jar) as http_session:
         http_session.rate_limiting = {
-            'requests_per_second': config['stratz']['requests_per_second']
+            'requests_per_second': config['stratz']['requests_per_second'],
+            'requests': []
         }
 
         hero_grid_coros = []
         for grid in config['grids']:
-            hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['pickrate_treshold'], config['stratz']['token'], http_session))
+            hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['modes'], grid['winrate_treshold'], grid['pickrate_treshold'], grid['show_pickrates'], grid['weeks'], config['stratz']['token'], http_session))
 
         hero_grids = await asyncio.gather(*hero_grid_coros)
 
