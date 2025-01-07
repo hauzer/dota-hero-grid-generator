@@ -1,0 +1,239 @@
+/////
+///// WARNING
+/////
+///// When creating your own config, be sure not to include any comments (lines starting with //).
+/////
+///// WARNING
+/////
+
+{
+    /// type: dict
+    /// required: true
+    /// description:
+    ///     Stratz data.
+    "stratz": {
+        ///
+        /// type: string
+        /// required: true
+        /// description:
+        ///     Get your own at https://stratz.com/api.
+        ///
+        "token": "my-token",
+
+        ///
+        /// type: int
+        /// required: true
+        /// description:
+        ///     Limits the maximum number of requests directed at the Stratz API to the indicated number.
+        ///
+		"requests_per_second": 3
+    },
+
+    ///
+    /// type: dict
+    /// required: true
+    /// description:
+    ///     Steam data.
+    ///
+    "steam": {
+        ///
+        /// type: string
+        /// required: true
+        /// description:
+        ///     Path to the Steam installation.
+        ///
+        "path": "C:\\Program Files (x86)\\Steam"
+    },
+
+    ///
+    /// type: dict
+    /// required: true
+    /// description:
+    ///     Grid data.
+    ///
+    "grids": [
+        {
+            ///
+            /// type: string
+            /// required: true
+            /// description:
+            ///     Name of the hero grid as displayed in-game.
+            ///
+            "name": "My Grid",
+
+            ///
+            /// type: array of strings
+            /// required: true
+            /// description:
+            ///     List of Steam accounts (not nicknames) which will get this grid.
+            ///
+            "users": ["account1", "account2"],
+
+            ///
+            /// type: list of categories
+            /// required: false
+            /// default: five categories, one for each position
+            /// description:
+            ///     List of hero categories which this grid will display.
+            ///
+            "categories": [
+                {
+                    ///
+                    /// type: string
+                    /// required: false
+                    /// default: names of positions with a '+' between them
+                    /// description:
+                    ///     Name of this category.
+                    ///
+                    "name": "My Category",
+
+                    ///
+                    /// type: list of enums as ints
+                    /// required: true
+                    /// description:
+                    ///     List of positions for which this category will pull and combine data for.
+                    ///
+                    /// enum values:
+                    ///     1
+                    ///     2
+                    ///     3
+                    ///     4
+                    ///     5
+                    ///
+                    ///
+                    "positions": [1]
+
+                    ///
+                    /// type: various
+                    /// required: false (if the grid has it defined)
+                    /// default: inherited from the grid
+                    /// description:
+                    ///     These will be inherited from the grid if not specified. If the grid doesn't have them defined,
+                    ///     they have to be defined in each category. If the grid has them defined, values here take precedence.
+                    ///
+                    // "ranks": [],
+                    // "modes": [],
+                    // "winrate_treshold": 0.00,
+                    // "pickrate_treshold": 0.00,
+                    // "show_pickrates": false,
+                    // "include_outliers": false,
+                    // "show_outliers_separately": false,
+                    // "winrate_outlier_treshold": 0.00,
+                    // "pickrate_outlier_treshold": 0.00,
+                    // "weeks": 0
+                }
+            ],
+
+            ///
+            /// type: array of enums as strings
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     List of ranks which will be used for calculating winrates and pickrates.
+            ///
+            /// enum values:
+            ///     Herald
+            ///     Guardian
+            ///     Crusader
+            ///     Archon
+            ///     Legend
+            ///     Ancient
+            ///     Divine
+            ///     Immortal
+            ///
+            "ranks": ["Divine", "Immortal"],
+
+            ///
+            /// type: array of enums as strings
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     List of modes which will be used for calculating winrates and pickrates.
+            ///
+            /// enum values:
+            ///     ALL_PICK
+            ///     ALL_PICK_RANKED
+            ///     ... more at https://api.stratz.com/graphiql (look for GameModeEnumType)
+            ///
+			"modes": ["ALL_PICK_RANKED"],
+
+            ///
+            /// type: float
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     Heroes with a winrate below this percentage won't be included.
+            ///
+			"winrate_treshold": 49.00,
+
+            ///
+            /// type: float
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     Heroes with a pickrate below this percentage won't be included.
+            ///
+            "pickrate_treshold": 3.00,
+
+            ///
+            /// type: bool
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     If true, show the pickrate percentage below the winrate percentage for each hero.
+            ///
+			"show_pickrates": true,
+
+            ///
+            /// type: bool
+            /// required: false (if all categories have it defined)
+            /// default: none
+            /// description:
+            ///     If true, will also include heroes which don't make the cut according to `winrate_treshold` and `pickrate_treshold`,
+            ///     but do have either a winrate or pickrate equal to or above `winrate_outlier_treshold` and `pickrate_outlier_treshold`,
+            ///     respectively.
+            ///
+            "include_outliers": false,
+
+            ///
+            /// type: bool
+            /// required: false (if all categories have it defined)
+            /// required: true (if `include_outliers` is true)
+            /// default: none
+            /// description:
+            ///     If true, outliers will have their own little section in the category, below regular heroes.
+            ///
+            "show_outliers_separately": true,
+
+            ///
+            /// type: float
+            /// required: false (if all categories have it defined)
+            /// required: true (if `include_outliers` is true and `pickrate_outlier_treshold` is unspecified)
+            /// default: none
+            /// description:
+            ///    Heroes with a winrate equal to or above this percentage will be considered as outliers and included.
+            ///
+            "winrate_outlier_treshold": 52.00,
+
+            ///
+            /// type: float
+            /// required: false (if all categories have it defined)
+            /// required: true (if `include_outliers` is true and `winrate_outlier_treshold` is unspecified)
+            /// default: none
+            /// description:
+            ///    Heroes with a pickrate equal to or above this percentage will be considered as outliers and included.
+            ///
+            "pickrate_outlier_treshold": 10.00,
+
+            ///
+            /// type: int
+            /// required: false (if all categories have it defined)
+            /// required: true
+            /// default: none
+            /// description:
+            ///     How many last weeks of data to use.
+            ///
+			"weeks": 4
+        }
+    ]
+}

@@ -42,14 +42,34 @@ class HeroGridCategory:
     HERO_HEIGHT = 135
     HERO_REAL_HEIGHT = 170
 
-    def __init__(self, name, position, ranks, modes, winrate_treshold, pickrate_treshold, show_pickrates, take_weeks, stratz_token, http_session):
+    def __init__(
+        self,
+        name,
+        positions,
+        ranks,
+        modes,
+        winrate_treshold,
+        pickrate_treshold,
+        show_pickrates,
+        include_outliers,
+        show_outliers_separately,
+        winrate_outlier_treshold,
+        pickrate_outlier_treshold,
+        take_weeks,
+        stratz_token,
+        http_session
+    ):
         self.name = name
-        self.position = position
+        self.positions = positions
         self.ranks = ranks
         self.modes = modes
         self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
         self.show_pickrates = show_pickrates
+        self.include_outliers = include_outliers
+        self.show_outliers_separately = show_outliers_separately
+        self.winrate_outlier_treshold = winrate_outlier_treshold
+        self.pickrate_outlier_treshold = pickrate_outlier_treshold
         self.take_weeks = take_weeks
         self.data = [{
             'category_name': name,
@@ -61,6 +81,7 @@ class HeroGridCategory:
         }]
         self.stratz_token = stratz_token
         self.http_session = http_session
+        self.real_height = 0
 
     @classmethod
     async def create(cls, *args, **kwargs):
@@ -72,7 +93,7 @@ class HeroGridCategory:
                     winWeek(
                         take: {inst.take_weeks},
                         bracketIds: [{','.join([rank.upper() for rank in inst.ranks])}],
-                        positionIds: [{inst.position}],
+                        positionIds: [{','.join([f'POSITION_{position}' for position in inst.positions])}],
                         gameModeIds: [{','.join([mode.upper() for mode in inst.modes])}]
                     ) {{
                         heroId,
@@ -147,57 +168,103 @@ class HeroGridCategory:
 
         x_position = 0
         y_position = inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
-        for hero in sorted(heroes, key=lambda hero: hero['winRate'], reverse=True):
-            if hero['winRate'] >= inst.winrate_treshold and hero['pickRate'] >= inst.pickrate_treshold:
-                if inst.show_pickrates:
-                    inst.data.append({
-                        'category_name': '  {:.2f}%'.format(hero['winRate']),
-                        'x_position': x_position,
-                        'y_position': y_position,
-                        'width': 0,
-                        'height': 0,
-                        'hero_ids': []
-                    })
+        def generate_hero(hero, start_x_position=None, end_x_position=None):
+            nonlocal inst
+            nonlocal x_position
+            nonlocal y_position
 
-                    inst.data.append({
-                        'category_name': '  {:.2f}%'.format(hero['pickRate']),
-                        'x_position': x_position,
-                        'y_position': y_position + 20,
-                        'width': inst.HERO_WIDTH,
-                        'height': inst.HERO_HEIGHT,
-                        'hero_ids': [
-                            hero['heroId']
-                        ]
-                    })
+            if start_x_position is None:
+                start_x_position = 0
 
-                    if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
-                        x_position = 0
-                        y_position += inst.HERO_REAL_HEIGHT + 20
-                    else:
-                        x_position += inst.HERO_REAL_WIDTH
+            if end_x_position is None:
+                end_x_position = 1200
+
+            if inst.show_pickrates:
+                inst.data.append({
+                    'category_name': '  {:.2f}%'.format(hero['winRate']),
+                    'x_position': x_position,
+                    'y_position': y_position,
+                    'width': 0,
+                    'height': 0,
+                    'hero_ids': []
+                })
+
+                inst.data.append({
+                    'category_name': '  {:.2f}%'.format(hero['pickRate']),
+                    'x_position': x_position,
+                    'y_position': y_position + 20,
+                    'width': inst.HERO_WIDTH,
+                    'height': inst.HERO_HEIGHT,
+                    'hero_ids': [
+                        hero['heroId']
+                    ]
+                })
+
+                if x_position + inst.HERO_REAL_WIDTH * 2 > end_x_position:
+                    x_position = start_x_position
+                    y_position += inst.HERO_REAL_HEIGHT + 20
                 else:
-                    inst.data.append({
-                        'category_name': '  {:.2f}%'.format(hero['winRate']),
-                        'x_position': x_position,
-                        'y_position': y_position,
-                        'width': inst.HERO_WIDTH,
-                        'height': inst.HERO_HEIGHT,
-                        'hero_ids': [
-                            hero['heroId']
-                        ]
-                    })
+                    x_position += inst.HERO_REAL_WIDTH
+            else:
+                inst.data.append({
+                    'category_name': '  {:.2f}%'.format(hero['winRate']),
+                    'x_position': x_position,
+                    'y_position': y_position,
+                    'width': inst.HERO_WIDTH,
+                    'height': inst.HERO_HEIGHT,
+                    'hero_ids': [
+                        hero['heroId']
+                    ]
+                })
 
-                    if x_position + inst.HERO_REAL_WIDTH * 2 > 1200:
-                        x_position = 0
-                        y_position += inst.HERO_REAL_HEIGHT
-                    else:
-                        x_position += inst.HERO_REAL_WIDTH
+                if x_position + inst.HERO_REAL_WIDTH * 2 > end_x_position:
+                    x_position = start_x_position
+                    y_position += inst.HERO_REAL_HEIGHT
+                else:
+                    x_position += inst.HERO_REAL_WIDTH
 
+        winrate_outlier_treshold = inst.winrate_outlier_treshold if inst.winrate_outlier_treshold is not None else 1000
+        pickrate_outlier_treshold = inst.pickrate_outlier_treshold if inst.pickrate_outlier_treshold is not None else 1000
+
+        category_heroes = []
+        for hero in sorted(heroes, key=lambda hero: hero['winRate'], reverse=True):
+            if (hero['winRate'] >= inst.winrate_treshold and hero['pickRate'] >= inst.pickrate_treshold) or (inst.include_outliers and not inst.show_outliers_separately and (hero['winRate'] >= winrate_outlier_treshold or hero['pickRate'] >= pickrate_outlier_treshold)):
+                generate_hero(hero)
+                category_heroes.append(hero)
+
+        if inst.include_outliers and inst.show_outliers_separately:
+            outliers = [h for h in heroes if not any(ch['heroId'] == h['heroId'] for ch in category_heroes) and (h['winRate'] >= winrate_outlier_treshold or h['pickRate'] >= pickrate_outlier_treshold)]
+
+            if len(outliers) > 0:
+                if x_position != 0:
+                    y_position += inst.HERO_REAL_HEIGHT
+
+                    if inst.show_pickrates:
+                        y_position += 20
+
+                x_position = inst.HERO_REAL_WIDTH
+
+                inst.data.append({
+                    'category_name': f'Outliers: {inst.name}',
+                    'x_position': x_position,
+                    'y_position': y_position,
+                    'width': 0,
+                    'height': 0,
+                    'hero_ids': []
+                })
+
+                y_position += inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
+
+                for hero in sorted(outliers, key=lambda hero: hero['winRate'], reverse=True):
+                    generate_hero(hero, inst.HERO_REAL_WIDTH, 1200 - inst.HERO_REAL_WIDTH)
+
+                if x_position == inst.HERO_REAL_WIDTH:
+                    x_position = 0
 
         if x_position == 0:
-            inst.real_height = y_position
+            inst.real_height += y_position
         else:
-            inst.real_height = y_position + inst.HERO_REAL_HEIGHT
+            inst.real_height += y_position + inst.HERO_REAL_HEIGHT
 
             if inst.show_pickrates:
                 inst.real_height += 20
@@ -206,18 +273,105 @@ class HeroGridCategory:
 
 
 class HeroGrid:
-    def __init__(self, name, users, ranks, modes, winrate_treshold, pickrate_treshold, show_pickrates, take_weeks, stratz_token, http_session):
+    def __init__(
+        self,
+        name,
+        users,
+        categories,
+        ranks,
+        modes,
+        winrate_treshold,
+        pickrate_treshold,
+        show_pickrates,
+        include_outliers,
+        show_outliers_separately,
+        winrate_outlier_treshold,
+        pickrate_outlier_treshold,
+        take_weeks,
+        stratz_token,
+        http_session
+    ):
         self.name = name
         self.users = users
+
+        if categories is None:
+            self.categories = [
+                {
+                    'name': 'Carry',
+                    'positions': [1]
+                },
+                {
+                    'name': 'Mid',
+                    'positions': [2]
+                },
+                {
+                    'name': 'Offlane',
+                    'positions': [3]
+                },
+                {
+                    'name': 'Support',
+                    'positions': [4]
+                },
+                {
+                    'name': 'Hard Support',
+                    'positions': [5]
+                }
+            ]
+        else:
+            self.categories = categories
+
         self.ranks = ranks
         self.modes = modes
         self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
         self.show_pickrates = show_pickrates
+        self.include_outliers = include_outliers
+        self.show_outliers_separately = show_outliers_separately
+        self.winrate_outlier_treshold = winrate_outlier_treshold
+        self.pickrate_outlier_treshold = pickrate_outlier_treshold
         self.take_weeks = take_weeks
 
-        if self.name is None:
-            self.name = 'Winrates by Position ({})'.format(' + '.join((ranks)))
+        for category in self.categories:
+            if category.get('name') is None:
+                category['name'] = ' + '.join(
+                    {
+                        1: 'Carry',
+                        2: 'Mid',
+                        3: 'Offlane',
+                        4: 'Support',
+                        5: 'Hard Support'
+                    }[position] for position in category['positions']
+                )
+
+            if category.get('ranks') is None:
+                category['ranks'] = self.ranks
+
+            if category.get('modes') is None:
+                category['modes'] = self.modes
+
+            if category.get('winrate_treshold') is None:
+                category['winrate_treshold'] = self.winrate_treshold
+
+            if category.get('pickrate_treshold') is None:
+                category['pickrate_treshold'] = self.pickrate_treshold
+
+            if category.get('show_pickrates') is None:
+                category['show_pickrates'] = self.show_pickrates
+
+            if category.get('include_outliers') is None:
+                category['include_outliers'] = self.include_outliers
+
+            if category.get('show_outliers_separately') is None:
+                category['show_outliers_separately'] = self.show_outliers_separately
+
+            if category.get('winrate_outlier_treshold') is None:
+                category['winrate_outlier_treshold'] = self.winrate_outlier_treshold
+
+            if category.get('pickrate_outlier_treshold') is None:
+                category['pickrate_outlier_treshold'] = self.pickrate_outlier_treshold
+
+            if category.get('weeks') is None:
+                category['weeks'] = self.take_weeks
 
         self.data = {
             'config_name': self.name,
@@ -233,8 +387,23 @@ class HeroGrid:
         inst = cls(*args, **kwargs)
 
         categories_coros = []
-        for name, position in zip(['Carry', 'Mid', 'Offlane', 'Support', 'Hard Support'], [f'POSITION_{n}' for n in range(1,6)]):
-            categories_coros.append(HeroGridCategory.create(name, position, inst.ranks, inst.modes, inst.winrate_treshold, inst.pickrate_treshold, inst.show_pickrates, inst.take_weeks, inst.stratz_token, inst.http_session))
+        for category in inst.categories:
+            categories_coros.append(HeroGridCategory.create(
+                category['name'],
+                category['positions'],
+                category['ranks'],
+                category['modes'],
+                category['winrate_treshold'],
+                category['pickrate_treshold'],
+                category['show_pickrates'],
+                category['include_outliers'],
+                category['show_outliers_separately'],
+                category['winrate_outlier_treshold'],
+                category['pickrate_outlier_treshold'],
+                category['weeks'],
+                inst.stratz_token,
+                inst.http_session
+            ))
 
         categories = await asyncio.gather(*categories_coros)
 
@@ -314,7 +483,23 @@ async def main():
 
         hero_grid_coros = []
         for grid in config['grids']:
-            hero_grid_coros.append(HeroGrid.create(grid.get('name'), grid['users'], grid['ranks'], grid['modes'], grid['winrate_treshold'], grid['pickrate_treshold'], grid['show_pickrates'], grid['weeks'], config['stratz']['token'], http_session))
+            hero_grid_coros.append(HeroGrid.create(
+                grid['name'],
+                grid['users'],
+                grid.get('categories'),
+                grid.get('ranks'),
+                grid.get('modes'),
+                grid.get('winrate_treshold'),
+                grid.get('pickrate_treshold'),
+                grid.get('show_pickrates'),
+                grid.get('include_outliers'),
+                grid.get('show_outliers_separately'),
+                grid.get('winrate_outlier_treshold'),
+                grid.get('pickrate_outlier_treshold'),
+                grid.get('weeks'),
+                config['stratz']['token'],
+                http_session
+            ))
 
         hero_grids = await asyncio.gather(*hero_grid_coros)
 

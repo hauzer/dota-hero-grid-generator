@@ -1,6 +1,6 @@
 {
     "stratz": {
-        "token": "Get your own at https://stratz.com/api",
+        "token": "my-token",
 		"requests_per_second": 3
     },
     "steam": {
@@ -8,42 +8,15 @@
     },
     "grids": [
         {
+            "name": "My Grid",
             "users": ["account1"],
-            "ranks": ["Divine", "Immortal"],
+            "ranks": ["Crusader", "Archon", "Legend"],
 			"modes": ["ALL_PICK_RANKED"],
 			"winrate_treshold": 49.00,
-            "pickrate_treshold": 5.00,
-			"show_pickrates": true,
-			"weeks": 2
-        },
-        {
-            "users": ["account1", "account2"],
-            "ranks": ["Archon", "Legend"],
-			"modes": ["ALL_PICK", "ALL_PICK_RANKED"],
-			"winrate_treshold": 48.00,
             "pickrate_treshold": 3.00,
-			"show_pickrates": false,
-			"weeks": 4
-        },
-        {
-            "name": "Clownin",
-            "users": ["account2"],
-            "ranks": ["Ancient"],
-			"modes": ["ALL_PICK", "ALL_PICK_RANKED"],
-			"winrate_treshold": 0,
-            "pickrate_treshold": 0,
-			"show_pickrates": false,
-			"weeks": 3
-        },
-        {
-            "name": "Playing with the Boys",
-            "users": ["account1", "account2", "account3"],
-            "ranks": ["Guardian", "Crusader"],
-			"modes": ["ALL_PICK", "ALL_PICK_RANKED"],
-			"winrate_treshold": 45.00,
-            "pickrate_treshold": 10.00,
 			"show_pickrates": true,
-			"weeks": 1
+            "include_outliers": false,
+			"weeks": 4
         }
     ]
 }

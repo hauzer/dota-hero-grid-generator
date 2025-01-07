@@ -23,11 +23,7 @@ Windows:
 * Configure `config.json`:
    * Get your own Stratz API token [here](https://stratz.com/api). You just need to log in with your Steam account.
    * Point to the Steam installation directory. Note that this is *not* where Dota is, but where the actual Steam executable resides (e.g. `steam.exe` on Windows).
-   * Set up your grids:
-     * Multiple grids are supported.
-     * Name the grids if you wish, using the `name` key. Otherwise, they'll be named automatically.
-     * Set up your rank(s).
-     * The `users` key denotes which Steam users use that particular grid. These usernames are account names (the thing you use to login), not nicknames. You need to set up that as well.
+   * Set up your grids. Take a look [here](config-schema.json) for detailed documentation.
 * Run:
   * If from a release, just double click on `dota_hero_grid_generator.exe`.
   * If from source on Linux, use the following command:  
