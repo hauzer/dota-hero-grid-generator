@@ -26,7 +26,7 @@
         /// description:
         ///     Limits the maximum number of requests directed at the Stratz API to the indicated number.
         ///
-		"requests_per_second": 3
+        "requests_per_second": 3
     },
 
     ///
@@ -155,7 +155,7 @@
             ///     ALL_PICK_RANKED
             ///     ... more at https://api.stratz.com/graphiql (look for GameModeEnumType)
             ///
-			"modes": ["ALL_PICK_RANKED"],
+            "modes": ["ALL_PICK_RANKED"],
 
             ///
             /// type: float
@@ -164,7 +164,7 @@
             /// description:
             ///     Heroes with a winrate below this percentage won't be included.
             ///
-			"winrate_treshold": 49.00,
+            "winrate_treshold": 49.00,
 
             ///
             /// type: float
@@ -182,7 +182,7 @@
             /// description:
             ///     If true, show the pickrate percentage below the winrate percentage for each hero.
             ///
-			"show_pickrates": true,
+            "show_pickrates": true,
 
             ///
             /// type: bool
@@ -233,7 +233,7 @@
             /// description:
             ///     How many last weeks of data to use.
             ///
-			"weeks": 4
+            "weeks": 4
         }
     ]
 }

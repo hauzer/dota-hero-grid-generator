@@ -1,7 +1,7 @@
 {
     "stratz": {
         "token": "my-token",
-		"requests_per_second": 3
+        "requests_per_second": 3
     },
     "steam": {
         "path": "C:\\Program Files (x86)\\Steam"
@@ -11,12 +11,12 @@
             "name": "My Grid",
             "users": ["account1"],
             "ranks": ["Crusader", "Archon", "Legend"],
-			"modes": ["ALL_PICK_RANKED"],
-			"winrate_treshold": 49.00,
+            "modes": ["ALL_PICK_RANKED"],
+            "winrate_treshold": 49.00,
             "pickrate_treshold": 3.00,
-			"show_pickrates": true,
+            "show_pickrates": true,
             "include_outliers": false,
-			"weeks": 4
+            "weeks": 4
         }
     ]
 }
