@@ -1,11 +1,12 @@
-from cx_Freeze import setup, Executable
+from cx_Freeze import setup
+
+build_exe_options = {
+    'include_files': ['config.json'],
+    'packages': ['multiprocessing']
+}
 
 setup(
-    executables=[Executable('dota_hero_grid_generator.py')],
-    options={
-        'build_exe': {
-            'include_files': ['config.json'],
-            'packages': ['multiprocessing']
-        }
-    }
+    name='dota-hero-grid-generator',
+    options={"build_exe": build_exe_options},
+    executables=[{'script': 'dota_hero_grid_generator.py'}]
 )
