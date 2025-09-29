@@ -48,6 +48,7 @@ class HeroGridCategory:
         positions,
         ranks,
         modes,
+        sort_by,
         winrate_treshold,
         pickrate_treshold,
         show_pickrates,
@@ -63,6 +64,7 @@ class HeroGridCategory:
         self.positions = positions
         self.ranks = ranks
         self.modes = modes
+        self.sort_by = sort_by
         self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
         self.show_pickrates = show_pickrates
@@ -229,8 +231,10 @@ class HeroGridCategory:
         winrate_outlier_treshold = inst.winrate_outlier_treshold if inst.winrate_outlier_treshold is not None else 1000
         pickrate_outlier_treshold = inst.pickrate_outlier_treshold if inst.pickrate_outlier_treshold is not None else 1000
 
+        sort_key = lambda hero: hero['pickRate'] if inst.sort_by == 'pick_rate' else hero['winRate']
+
         category_heroes = []
-        for hero in sorted(heroes, key=lambda hero: hero['winRate'], reverse=True):
+        for hero in sorted(heroes, key=sort_key, reverse=True):
             if (hero['winRate'] >= inst.winrate_treshold and hero['pickRate'] >= inst.pickrate_treshold) or (inst.include_outliers and not inst.show_outliers_separately and (hero['winRate'] >= winrate_outlier_treshold or hero['pickRate'] >= pickrate_outlier_treshold)):
                 generate_hero(hero)
                 category_heroes.append(hero)
@@ -258,7 +262,7 @@ class HeroGridCategory:
 
                 y_position += inst.HERO_REAL_HEIGHT - inst.HERO_HEIGHT
 
-                for hero in sorted(outliers, key=lambda hero: hero['winRate'], reverse=True):
+                for hero in sorted(outliers, key=sort_key, reverse=True):
                     generate_hero(hero, inst.HERO_REAL_WIDTH, 1200 - inst.HERO_REAL_WIDTH)
 
                 if x_position == inst.HERO_REAL_WIDTH:
@@ -283,6 +287,7 @@ class HeroGrid:
         categories,
         ranks,
         modes,
+        sort_by,
         winrate_treshold,
         pickrate_treshold,
         show_pickrates,
@@ -325,6 +330,12 @@ class HeroGrid:
 
         self.ranks = ranks
         self.modes = modes
+
+        if sort_by is None:
+            self.sort_by = 'win_rate'
+        else:
+            self.sort_by = sort_by
+
         self.winrate_treshold = winrate_treshold
         self.pickrate_treshold = pickrate_treshold
         self.show_pickrates = show_pickrates
@@ -351,6 +362,9 @@ class HeroGrid:
 
             if category.get('modes') is None:
                 category['modes'] = self.modes
+
+            if category.get('sort_by') is None:
+                category['sort_by'] = self.sort_by
 
             if category.get('winrate_treshold') is None:
                 category['winrate_treshold'] = self.winrate_treshold
@@ -396,6 +410,7 @@ class HeroGrid:
                 category['positions'],
                 category['ranks'],
                 category['modes'],
+                category['sort_by'],
                 category['winrate_treshold'],
                 category['pickrate_treshold'],
                 category['show_pickrates'],
@@ -492,6 +507,7 @@ async def main():
                 grid.get('categories'),
                 grid.get('ranks'),
                 grid.get('modes'),
+                grid.get('sort_by'),
                 grid.get('winrate_treshold'),
                 grid.get('pickrate_treshold'),
                 grid.get('show_pickrates'),
