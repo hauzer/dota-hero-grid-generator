@@ -138,6 +138,9 @@ class HeroGridCategory:
                     if json_data['message'] == 'API rate limit exceeded':
                         print('You\'re being rate-limited by Stratz. Lower requests_per_second in the configuration file.\n\n')
                         os._exit()
+                    elif json_data['message'] == 'A bearer token is required for a request. View more at https://stratz.com/api':
+                        print('Your Stratz API token has expired. Refresh it at https://stratz.com/api.\n\n')
+                        os._exit()
                 except:
                     pass
 
