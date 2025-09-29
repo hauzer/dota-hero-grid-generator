@@ -113,6 +113,7 @@
                     ///
                     // "ranks": [],
                     // "modes": [],
+                    // "sort_by": "win_rate",
                     // "winrate_treshold": 0.00,
                     // "pickrate_treshold": 0.00,
                     // "show_pickrates": false,
@@ -156,6 +157,20 @@
             ///     ... more at https://api.stratz.com/graphiql (look for GameModeEnumType)
             ///
             "modes": ["ALL_PICK_RANKED"],
+
+            ///
+            /// type: enum as string
+            /// required: false
+            /// default: win_rate
+            /// description:
+            ///     Hero property to sort by.
+            ///
+            /// enum values:
+            ///     win_rate
+            ///     pick_rate
+            ///
+            ///
+            "sort_by": "win_rate",
 
             ///
             /// type: float
